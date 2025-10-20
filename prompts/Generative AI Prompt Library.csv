@@ -1,0 +1,198 @@
+category name,title,text
+Documentation,New Hire Onboarding Wiki Page,"Draft a wiki page outlining the steps for onboarding new team members, including necessary tools and resources."
+Documentation,Code Review Process Documentation,"Create documentation for our code review process, detailing each step and responsible parties."
+Documentation,Convert Markdown to HTML Markup,"System role
+You are an expert converter that transforms Markdown into ServiceNow Knowledge Base safe HTML.
+
+Goal
+Given a Markdown document, output a clean, fully sanitized HTML fragment that renders reliably in ServiceNow Knowledge articles.
+
+Input
+The Markdown to convert will be provided between the markers:
+[BEGIN MARKDOWN]
+... markdown here ...
+[END MARKDOWN]
+
+Strict output rules
+1) Output only an HTML fragment. Do not include doctype, html, head, or body tags.
+2) Use only safe, simple HTML elements:
+   - h1, h2, h3, h4
+   - p, br
+   - strong, em, u, s, sup, sub
+   - ul, ol, li
+   - a
+   - img
+   - pre, code
+   - blockquote
+   - table, thead, tbody, tr, th, td
+   - div, span
+3) Prohibited elements: style, script, iframe, object, embed, link, form, video, audio, svg, canvas.
+4) Prohibited attributes: on* event handlers, style blocks, javascript: urls, data urls (except data image if explicitly allowed), inline css variables.
+5) Links
+   - Allow only http or https href values.
+   - Add rel=""noopener noreferrer"" for external links.
+   - Add target=""_blank"" for external links.
+6) Images
+   - Keep only http or https src values.
+   - Always include meaningful alt text. If missing, use a short descriptive placeholder.
+   - Do not include width or height attributes unless provided as numeric px values.
+7) Headings and anchors
+   - Convert markdown headings to h1 to h4.
+   - Generate id attributes for headings using lowercase ascii letters, numbers, and hyphens only. Strip other characters.
+   - If the markdown contains a table of contents, link to these ids.
+8) Code
+   - Convert fenced code blocks to <pre><code> with language class if known.
+   - Escape code content: replace &, <, and > with entities.
+   - Use spaces, not tabs, in code blocks.
+9) Tables
+   - Convert markdown tables to table, thead, tbody, tr, th, td.
+   - Do not add inline styles or nonstandard attributes.
+10) Lists
+   - Preserve ordered and unordered lists. Nest lists using proper li elements.
+11) Text and punctuation
+   - Use plain ascii quotes and dashes. Do not output smart quotes or special punctuation.
+12) Layout and styling
+   - Prefer unstyled semantic html.
+   - If simple layout is required, you may use minimal inline attributes on div or span only, limited to:
+     role, aria-label, aria-describedby, id, class.
+   - If a grid layout is explicitly required by the markdown, you may use inline layout with div only, using these inline style properties:
+     display, grid-template-columns, gap, padding, margin, border, border-radius, background, width, height.
+     Use px units. Do not use css variables. Do not use shorthand that implies external stylesheets.
+     Example allowed: <div style=""display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px""></div>
+13) Sanitization
+   - Remove or rewrite anything not allowed by the above rules.
+   - Strip comments.
+   - Remove empty tags.
+   - Normalize whitespace.
+14) Accessibility
+   - Ensure heading order is logical and does not skip levels.
+   - Ensure link text is descriptive, not just ""click here"".
+   - Ensure all images have alt text.
+15) Final verification
+   - Confirm all tags are closed and properly nested.
+   - Confirm no prohibited elements or attributes remain.
+   - Confirm output is valid html that will render in a ServiceNow knowledge article without external css or scripts.
+
+Deliverable format
+Return only the final HTML fragment. Do not include explanations, notes, or any wrapper text.
+
+Ready prompt usage
+Convert the following markdown to a ServiceNow safe HTML fragment:
+[BEGIN MARKDOWN]
+... paste markdown here ...
+[END MARKDOWN]"
+Documentation,Convert Text to Markdown Format,Convert the following text/document into Markdown Code block
+General Writing,Executive Email,"Draft a concise executive email (~150 words) that states decision needed, options (with tradeoffs), and recommended path with next steps. Use plain language."
+General Writing,Rewrite for Clarity,"Rewrite the following text to be 30% shorter, clearer, and more direct. Preserve meaning and any lists. Return diff-style bullets of key changes."
+General Writing,Prompt to Spec,"Convert a vague idea into a structured prompt using: Role, Goal, Inputs, Constraints, Output Format, and Review Criteria. Return a filled template."
+GIT,Generate Commit Message from Code Diff,"Given the following code changes, generate a concise and descriptive commit message."
+GIT,Commit Summary from File Changes,Analyze these file modifications and create a commit message summarizing the key updates and their purpose.
+Meeting Notes,Meeting Follow-up,"I scheduled a meeting with the following description below. I want you to act as a meeting scribe by reviewing the meeting transcript and Provide a brief overview of our meeting, emphasizing the next steps for each team member."
+Meeting Notes,Meeting Transcript Summary PDF,"Context:  
+I will provide you with a meeting transcript. Your task is to create a concise yet thorough meeting summary that distills the main points, decisions, action items, and next steps discussed. The summary must be structured so someone who did not attend can fully understand what was discussed, what was decided, and what needs to be done moving forward. If the transcript doesn't support certain aspects of this prompt then don't force the output to be more than what the transcript supports. Above all avoid making up facts or assumptions that are not directly supported by the transcript. Use the title of the transcript to include the date in the output  
+  
+Instructions:  
+1. Start with a brief overview of the meetings purpose and objectives to set the context.  
+2. List key discussion points summarize each main topic, noting important arguments, insights, or data.  
+3. Outline decisions made for each topic, record the decisions, rationale, or influencing factors.  
+4. Detail action items & responsibilities for each decision or unresolved item, list:   
+Specific actions to be taken  
+Assigned individuals or teams  
+5. Specify deadlines or timelines for each action item. If they were indicated.   
+6. Note unresolved issues or topics requiring further discussion.  
+7. Conclude with an overall summary capturing the meetings outcomes and emphasizing next steps.  
+  
+Output Requirements:  
+Clear, concise, and well-structured  
+Covers all major points, decisions, and action items  
+Understandable for someone who wasn't present
+Pdf Document file"
+Meeting Notes,Meeting Transcript Summary Plain Text,"Context:  
+I will provide you with a meeting transcript. Your task is to create a concise yet thorough meeting summary that distills the main points, decisions, action items, and next steps discussed. The summary must be structured so someone who did not attend can fully understand what was discussed, what was decided, and what needs to be done moving forward. If the transcript doesn't support certain aspects of this prompt then don't force the output to be more than what the transcript supports. Above all avoid making up facts or assumptions that are not directly supported by the transcript. Use the title of the transcript to include the date in the output  
+  
+Instructions:  
+1. Start with a brief overview of the meetings purpose and objectives to set the context.  
+2. List key discussion points summarize each main topic, noting important arguments, insights, or data.  
+3. Outline decisions made for each topic, record the decisions, rationale, or influencing factors.  
+4. Detail action items & responsibilities for each decision or unresolved item, list:   
+Specific actions to be taken  
+Assigned individuals or teams  
+5. Specify deadlines or timelines for each action item. If they were indicated.   
+6. Note unresolved issues or topics requiring further discussion.  
+7. Conclude with an overall summary capturing the meeting's outcomes and emphasizing next steps.  
+  
+Output Requirements:  
+Clear, concise, and well-structured  
+Covers all major points, decisions, and action items  
+Understandable for someone who wasn't present
+Plain Text file"
+Project Management,Create Anonymized Production-like Data,Provide anonymized data similar in structure to our production database schema.
+Visualization,Best Chart Types for Given Dataset,"What are the best chart types to visualize the following data:
+[describe data]"
+Project Management,Summarize Commits into Client Update,Summarize the following commit messages into a client-friendly status update.
+Project Management,Progress Report from Development Tasks,Create a progress report based on these development activities.
+Project Management,Update Email on Weekly Dev Progress,Draft an update email highlighting the key developments from this week's commits.
+Project Management,Meeting Notes Summary with Deadlines,"Summarize the following meeting notes, including action items and deadlines."
+Project Management,Follow-up Email Discussion Summary,Draft a follow-up email outlining the key points discussed and scheduled follow-up dates.
+SQL,Optimize Azure SQL Query,"You are an expert Azure SQL performance engineer. Refactor the query I paste next to reduce CPU and logical reads without changing results. Prioritize: predicate pushdown, sargability, removing scalar functions on filtered columns, simplifying expressions, and eliminating unnecessary sorts/window frames. Do not suggest new indexes or CTEs unless unavoidable. Return the rewritten query and a bullet list of changes."
+SQL,Explain Query Section,"Add a concise header comment that explains what this SQL does, why key joins/filters exist, etc. Assume a new developer is reading this."
+Super Note,Clean Up Converted Text,"You are given text converted from my Supernote device. The text may contain 
+typos, missing words, wrong characters (like symbols, slashes, or misplaced 
+punctuation), and inconsistent formatting.
+
+**Task:**  
+- Correct grammar, spelling, and transcription errors.  
+- Preserve meaning; do not add or invent facts.  
+- Keep structure (headings, bullets, indentation) clear and readable.  
+- Where something is ambiguous, leave it as-is rather than guessing.  
+
+Return only the cleaned text in a markdown code block with out any other text or follow-up questions"
+Workshop Facilitation,AI-in-BI Activity,"Design a 20-minute interactive exercise showing AI as augmentation, not a crutch, for BI developers. Include setup, materials, prompts, and debrief questions."
+Workshop Facilitation,Session Objectives,"Convert these rough notes into crisp learning objectives with measurable verbs (Bloom's), each with an assessment/check for understanding."
+Workshop Facilitation,Slide Speaker Notes,Turn the outline into slide-by-slide speaker notes with time estimates and audience engagement moments.
+Workshop Facilitation,Workshop Draft,"You are a professional workshop facilitator who has experience developing workshops that are engaging and content rich that helps professionals gain important insights to perform better in their roles. I am interested in gaining knowledge from you on how to develop my attached content into a workshop targeted towards entry to midlevel BI developers. To aid you I've outlined my goals and outcomes for this session, attached the session abstract, and PowerPoint file.
+
+##
+Workshop Goals and Outcomes
+
+	1.	What are the primary learning objectives for the workshop? - How to use AI as augmentation and not a crutch. The importance of workflows to enable more predictable and higher quality outcomes. 
+	2.	What specific skills or knowledge should participants gain by the end? Developing workflows for their work. Using Gen AI to augment those workflows. 
+	3.	Are there measurable outcomes you expect participants to achieve? No
+
+Audience and Relevance
+
+	4.	What level of familiarity with AI and BI tools do the target participants have? No familiarity with AI tools, but but intermediate experience BI tools
+	5.	Are there specific challenges or gaps in skills that your audience faces? Tedious  tasks such as documenting work, project planning, requirements gathering, knowledge articles for onboarding new team members.
+	6.	What industries or domains do the participants work in, and how does the content address their unique needs? Higher Education Data practitioners is my core audience but industry data practitioners may also find this useful.
+
+Content Selection
+
+	7.	Which sections of the document are most crucial for entry-to-midlevel BI developers? The project management is the most crucial because building any report with data should start with the a good project management process that aligns development with customers needs
+	8.	Are there concepts or sections that need simplification for the target audience? No
+	9.	How do you plan to connect the theoretical content to practical, real-world applications? I plan to use the prompts to demonstrate practical application
+
+Engagement and Interactivity
+
+	10.	How will you structure the workshop to keep participants engaged (e.g., hands-on activities, group discussions)? I am not sure so I am open to suggestions
+	11.	What tools or platforms will you use to facilitate interactive learning? I plan to do a mix of PowerPoint and hands on where participants should bring their own laptop.
+
+Workshop Format and Delivery
+
+	12.	What is the ideal duration of the workshop? Minimum of 90 minutes.
+	13.	Will the workshop be in-person, virtual, or hybrid? I'd like to start in-person
+	14.	How will you incorporate visual aids, examples, or live demonstrations? Using screen captures inserted in the PowerPoint presentation I make. 
+
+Assessment and Feedback
+
+	15.	How will you assess participant understanding throughout the workshop? I am not sure I need to.
+	16.	What mechanisms will you use to gather feedback for improvement? Google form.
+
+Supporting Materials
+
+	17.	What additional resources (e.g., templates, sample datasets, prompts) will you provide to participants? Sample prompts, sql scripts, and handouts
+	18.	Are there recommended pre-workshop readings or prerequisites for attendees? Basic understanding of sql, BI Tools (Tableau, Power BI, etc.), basic markdown knowledge would be helpful, basic git knowledge
+
+Challenges and Opportunities
+
+	19.	What potential challenges do you foresee in delivering this content to the target audience? Access to Gen AI tools
+	20.	How can AI tools and techniques be integrated into the workshop delivery itself (e.g., generating insights in real-time)? Unsure, feel free to provide thoughts."

@@ -1,0 +1,124 @@
+{
+  "Documentation": [
+    {
+      "title": "New Hire Onboarding Wiki Page",
+      "text": "Draft a wiki page outlining the steps for onboarding new team members, including necessary tools and resources."
+    },
+    {
+      "title": "Code Review Process Documentation",
+      "text": "Create documentation for our code review process, detailing each step and responsible parties."
+    },
+    {
+      "title": "Convert Markdown to HTML Markup",
+      "text": "System role\nYou are an expert converter that transforms Markdown into ServiceNow Knowledge Base safe HTML.\n\nGoal\nGiven a Markdown document, output a clean, fully sanitized HTML fragment that renders reliably in ServiceNow Knowledge articles.\n\nInput\nThe Markdown to convert will be provided between the markers:\n[BEGIN MARKDOWN]\n... markdown here ...\n[END MARKDOWN]\n\nStrict output rules\n1) Output only an HTML fragment. Do not include doctype, html, head, or body tags.\n2) Use only safe, simple HTML elements:\n   - h1, h2, h3, h4\n   - p, br\n   - strong, em, u, s, sup, sub\n   - ul, ol, li\n   - a\n   - img\n   - pre, code\n   - blockquote\n   - table, thead, tbody, tr, th, td\n   - div, span\n3) Prohibited elements: style, script, iframe, object, embed, link, form, video, audio, svg, canvas.\n4) Prohibited attributes: on* event handlers, style blocks, javascript: urls, data urls (except data image if explicitly allowed), inline css variables.\n5) Links\n   - Allow only http or https href values.\n   - Add rel=\"noopener noreferrer\" for external links.\n   - Add target=\"_blank\" for external links.\n6) Images\n   - Keep only http or https src values.\n   - Always include meaningful alt text. If missing, use a short descriptive placeholder.\n   - Do not include width or height attributes unless provided as numeric px values.\n7) Headings and anchors\n   - Convert markdown headings to h1 to h4.\n   - Generate id attributes for headings using lowercase ascii letters, numbers, and hyphens only. Strip other characters.\n   - If the markdown contains a table of contents, link to these ids.\n8) Code\n   - Convert fenced code blocks to <pre><code> with language class if known.\n   - Escape code content: replace &, <, and > with entities.\n   - Use spaces, not tabs, in code blocks.\n9) Tables\n   - Convert markdown tables to table, thead, tbody, tr, th, td.\n   - Do not add inline styles or nonstandard attributes.\n10) Lists\n   - Preserve ordered and unordered lists. Nest lists using proper li elements.\n11) Text and punctuation\n   - Use plain ascii quotes and dashes. Do not output smart quotes or special punctuation.\n12) Layout and styling\n   - Prefer unstyled semantic html.\n   - If simple layout is required, you may use minimal inline attributes on div or span only, limited to:\n     role, aria-label, aria-describedby, id, class.\n   - If a grid layout is explicitly required by the markdown, you may use inline layout with div only, using these inline style properties:\n     display, grid-template-columns, gap, padding, margin, border, border-radius, background, width, height.\n     Use px units. Do not use css variables. Do not use shorthand that implies external stylesheets.\n     Example allowed: <div style=\"display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px\"></div>\n13) Sanitization\n   - Remove or rewrite anything not allowed by the above rules.\n   - Strip comments.\n   - Remove empty tags.\n   - Normalize whitespace.\n14) Accessibility\n   - Ensure heading order is logical and does not skip levels.\n   - Ensure link text is descriptive, not just \"click here\".\n   - Ensure all images have alt text.\n15) Final verification\n   - Confirm all tags are closed and properly nested.\n   - Confirm no prohibited elements or attributes remain.\n   - Confirm output is valid html that will render in a ServiceNow knowledge article without external css or scripts.\n\nDeliverable format\nReturn only the final HTML fragment. Do not include explanations, notes, or any wrapper text.\n\nReady prompt usage\nConvert the following markdown to a ServiceNow safe HTML fragment:\n[BEGIN MARKDOWN]\n... paste markdown here ...\n[END MARKDOWN]"
+    },
+    {
+      "title": "Convert Text to Markdown Format",
+      "text": "Convert the following text/document into Markdown Code block"
+    }
+  ],
+  "GIT": [
+    {
+      "title": "Generate Commit Message from Code Diff",
+      "text": "Given the following code changes, generate a concise and descriptive commit message."
+    },
+    {
+      "title": "Commit Summary from File Changes",
+      "text": "Analyze these file modifications and create a commit message summarizing the key updates and their purpose."
+    }
+  ],
+  "General Writing": [
+    {
+      "title": "Executive Email",
+      "text": "Draft a concise executive email (~150 words) that states decision needed, options (with tradeoffs), and recommended path with next steps. Use plain language."
+    },
+    {
+      "title": "Rewrite for Clarity",
+      "text": "Rewrite the following text to be 30% shorter, clearer, and more direct. Preserve meaning and any lists. Return diff-style bullets of key changes."
+    },
+    {
+      "title": "Prompt to Spec",
+      "text": "Convert a vague idea into a structured prompt using: Role, Goal, Inputs, Constraints, Output Format, and Review Criteria. Return a filled template."
+    }
+  ],
+  "Meeting Notes": [
+    {
+      "title": "Meeting Follow-up",
+      "text": "I scheduled a meeting with the following description below. I want you to act as a meeting scribe by reviewing the meeting transcript and Provide a brief overview of our meeting, emphasizing the next steps for each team member."
+    },
+    {
+      "title": "Meeting Transcript Summary PDF",
+      "text": "Context:  \nI will provide you with a meeting transcript. Your task is to create a concise yet thorough meeting summary that distills the main points, decisions, action items, and next steps discussed. The summary must be structured so someone who did not attend can fully understand what was discussed, what was decided, and what needs to be done moving forward. If the transcript doesn't support certain aspects of this prompt then don't force the output to be more than what the transcript supports. Above all avoid making up facts or assumptions that are not directly supported by the transcript. Use the title of the transcript to include the date in the output  \n  \nInstructions:  \n1. Start with a brief overview of the meetings purpose and objectives to set the context.  \n2. List key discussion points summarize each main topic, noting important arguments, insights, or data.  \n3. Outline decisions made for each topic, record the decisions, rationale, or influencing factors.  \n4. Detail action items & responsibilities for each decision or unresolved item, list:   \nSpecific actions to be taken  \nAssigned individuals or teams  \n5. Specify deadlines or timelines for each action item. If they were indicated.   \n6. Note unresolved issues or topics requiring further discussion.  \n7. Conclude with an overall summary capturing the meetings outcomes and emphasizing next steps.  \n  \nOutput Requirements:  \nClear, concise, and well-structured  \nCovers all major points, decisions, and action items  \nUnderstandable for someone who wasn't present\nPdf Document file"
+    },
+    {
+      "title": "Meeting Transcript Summary Plain Text",
+      "text": "Context:  \nI will provide you with a meeting transcript. Your task is to create a concise yet thorough meeting summary that distills the main points, decisions, action items, and next steps discussed. The summary must be structured so someone who did not attend can fully understand what was discussed, what was decided, and what needs to be done moving forward. If the transcript doesn't support certain aspects of this prompt then don't force the output to be more than what the transcript supports. Above all avoid making up facts or assumptions that are not directly supported by the transcript. Use the title of the transcript to include the date in the output  \n  \nInstructions:  \n1. Start with a brief overview of the meetings purpose and objectives to set the context.  \n2. List key discussion points summarize each main topic, noting important arguments, insights, or data.  \n3. Outline decisions made for each topic, record the decisions, rationale, or influencing factors.  \n4. Detail action items & responsibilities for each decision or unresolved item, list:   \nSpecific actions to be taken  \nAssigned individuals or teams  \n5. Specify deadlines or timelines for each action item. If they were indicated.   \n6. Note unresolved issues or topics requiring further discussion.  \n7. Conclude with an overall summary capturing the meeting's outcomes and emphasizing next steps.  \n  \nOutput Requirements:  \nClear, concise, and well-structured  \nCovers all major points, decisions, and action items  \nUnderstandable for someone who wasn't present\nPlain Text file"
+    }
+  ],
+  "Project Management": [
+    {
+      "title": "Create Anonymized Production-like Data",
+      "text": "Provide anonymized data similar in structure to our production database schema."
+    },
+    {
+      "title": "Summarize Commits into Client Update",
+      "text": "Summarize the following commit messages into a client-friendly status update."
+    },
+    {
+      "title": "Progress Report from Development Tasks",
+      "text": "Create a progress report based on these development activities."
+    },
+    {
+      "title": "Update Email on Weekly Dev Progress",
+      "text": "Draft an update email highlighting the key developments from this week's commits."
+    },
+    {
+      "title": "Meeting Notes Summary with Deadlines",
+      "text": "Summarize the following meeting notes, including action items and deadlines."
+    },
+    {
+      "title": "Follow-up Email Discussion Summary",
+      "text": "Draft a follow-up email outlining the key points discussed and scheduled follow-up dates."
+    }
+  ],
+  "SQL": [
+    {
+      "title": "Optimize Azure SQL Query",
+      "text": "You are an expert Azure SQL performance engineer. Refactor the query I paste next to reduce CPU and logical reads without changing results. Prioritize: predicate pushdown, sargability, removing scalar functions on filtered columns, simplifying expressions, and eliminating unnecessary sorts/window frames. Do not suggest new indexes or CTEs unless unavoidable. Return the rewritten query and a bullet list of changes."
+    },
+    {
+      "title": "Explain Query Section",
+      "text": "Add a concise header comment that explains what this SQL does, why key joins/filters exist, etc. Assume a new developer is reading this."
+    }
+  ],
+  "Super Note": [
+    {
+      "title": "Clean Up Converted Text",
+      "text": "You are given text converted from my Supernote device. The text may contain \ntypos, missing words, wrong characters (like symbols, slashes, or misplaced \npunctuation), and inconsistent formatting.\n\n**Task:**  \n- Correct grammar, spelling, and transcription errors.  \n- Preserve meaning; do not add or invent facts.  \n- Keep structure (headings, bullets, indentation) clear and readable.  \n- Where something is ambiguous, leave it as-is rather than guessing.  \n\nReturn only the cleaned text in a markdown code block with out any other text or follow-up questions"
+    }
+  ],
+  "Visualization": [
+    {
+      "title": "Best Chart Types for Given Dataset",
+      "text": "What are the best chart types to visualize the following data:\n[describe data]"
+    }
+  ],
+  "Workshop Facilitation": [
+    {
+      "title": "AI-in-BI Activity",
+      "text": "Design a 20-minute interactive exercise showing AI as augmentation, not a crutch, for BI developers. Include setup, materials, prompts, and debrief questions."
+    },
+    {
+      "title": "Session Objectives",
+      "text": "Convert these rough notes into crisp learning objectives with measurable verbs (Bloom's), each with an assessment/check for understanding."
+    },
+    {
+      "title": "Slide Speaker Notes",
+      "text": "Turn the outline into slide-by-slide speaker notes with time estimates and audience engagement moments."
+    },
+    {
+      "title": "Workshop Draft",
+      "text": "You are a professional workshop facilitator who has experience developing workshops that are engaging and content rich that helps professionals gain important insights to perform better in their roles. I am interested in gaining knowledge from you on how to develop my attached content into a workshop targeted towards entry to midlevel BI developers. To aid you I've outlined my goals and outcomes for this session, attached the session abstract, and PowerPoint file.\n\n##\nWorkshop Goals and Outcomes\n\n\t1.\tWhat are the primary learning objectives for the workshop? - How to use AI as augmentation and not a crutch. The importance of workflows to enable more predictable and higher quality outcomes. \n\t2.\tWhat specific skills or knowledge should participants gain by the end? Developing workflows for their work. Using Gen AI to augment those workflows. \n\t3.\tAre there measurable outcomes you expect participants to achieve? No\n\nAudience and Relevance\n\n\t4.\tWhat level of familiarity with AI and BI tools do the target participants have? No familiarity with AI tools, but but intermediate experience BI tools\n\t5.\tAre there specific challenges or gaps in skills that your audience faces? Tedious  tasks such as documenting work, project planning, requirements gathering, knowledge articles for onboarding new team members.\n\t6.\tWhat industries or domains do the participants work in, and how does the content address their unique needs? Higher Education Data practitioners is my core audience but industry data practitioners may also find this useful.\n\nContent Selection\n\n\t7.\tWhich sections of the document are most crucial for entry-to-midlevel BI developers? The project management is the most crucial because building any report with data should start with the a good project management process that aligns development with customers needs\n\t8.\tAre there concepts or sections that need simplification for the target audience? No\n\t9.\tHow do you plan to connect the theoretical content to practical, real-world applications? I plan to use the prompts to demonstrate practical application\n\nEngagement and Interactivity\n\n\t10.\tHow will you structure the workshop to keep participants engaged (e.g., hands-on activities, group discussions)? I am not sure so I am open to suggestions\n\t11.\tWhat tools or platforms will you use to facilitate interactive learning? I plan to do a mix of PowerPoint and hands on where participants should bring their own laptop.\n\nWorkshop Format and Delivery\n\n\t12.\tWhat is the ideal duration of the workshop? Minimum of 90 minutes.\n\t13.\tWill the workshop be in-person, virtual, or hybrid? I'd like to start in-person\n\t14.\tHow will you incorporate visual aids, examples, or live demonstrations? Using screen captures inserted in the PowerPoint presentation I make. \n\nAssessment and Feedback\n\n\t15.\tHow will you assess participant understanding throughout the workshop? I am not sure I need to.\n\t16.\tWhat mechanisms will you use to gather feedback for improvement? Google form.\n\nSupporting Materials\n\n\t17.\tWhat additional resources (e.g., templates, sample datasets, prompts) will you provide to participants? Sample prompts, sql scripts, and handouts\n\t18.\tAre there recommended pre-workshop readings or prerequisites for attendees? Basic understanding of sql, BI Tools (Tableau, Power BI, etc.), basic markdown knowledge would be helpful, basic git knowledge\n\nChallenges and Opportunities\n\n\t19.\tWhat potential challenges do you foresee in delivering this content to the target audience? Access to Gen AI tools\n\t20.\tHow can AI tools and techniques be integrated into the workshop delivery itself (e.g., generating insights in real-time)? Unsure, feel free to provide thoughts."
+    }
+  ]
+}

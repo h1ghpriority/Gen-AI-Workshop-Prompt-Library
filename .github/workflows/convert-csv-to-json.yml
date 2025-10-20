@@ -1,0 +1,46 @@
+# .github/workflows/convert-csv-to-json.yml
+name: Convert CSV to JSON
+
+on:
+  push:
+    paths:
+      - "prompts/*.csv"
+      - "scripts/csv_to_json.py"
+      - ".github/workflows/convert-csv-to-json.yml"
+  pull_request:
+    paths:
+      - "prompts/*.csv"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas
+
+      - name: Convert CSV → JSON
+        run: |
+          python scripts/csv_to_json.py "prompts/*.csv"
+
+      - name: Auto-commit generated JSON (push events only)
+        if: github.event_name == 'push'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: auto-generate JSON from CSV"
+          file_pattern: "prompts/*.json"
