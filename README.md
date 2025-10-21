@@ -17,9 +17,9 @@ What this repo does
 
 Who this is for
 ---------------
-• Anyone who wants a simple, version-controlled prompt library.
-• Workshop participants who prefer editing prompts in spreadsheets (CSV) and consuming them as JSON in apps or demos.
-• Beginners to GitHub Actions who want a clean, understandable workflow.
+- Anyone who wants a simple, version-controlled prompt library.
+- Workshop participants who prefer editing prompts in spreadsheets (CSV) and consuming them as JSON in apps or demos.
+- Beginners to GitHub Actions who want a clean, understandable workflow.
 
 
 Repo structure
@@ -38,14 +38,14 @@ Repo structure
 
 How the automation works
 ------------------------
-• Triggered on:
+- Triggered on:
   - push to files under prompts/*.csv
   - pull requests that touch prompts/*.csv
   - manual run (workflow_dispatch) from the GitHub Actions tab
-• Uses Python 3.11 and pandas to read CSV and write JSON
-• Auto-commits generated JSON (for push events only) with message:
+- Uses Python 3.11 and pandas to read CSV and write JSON
+- Auto-commits generated JSON (for push events only) with message:
   "chore: auto-generate JSON from CSV"
-• The Action has "contents: write" permission to push changes back
+- The Action has "contents: write" permission to push changes back
 
 You can view/modify the workflow at:
 .github/workflows/convert-csv-to-json.yml
@@ -78,6 +78,7 @@ Tip: Use quotes around fields that contain commas or line breaks.
 What the generated JSON looks like
 ----------------------------------
 Example: prompts/example_prompts.json (auto-generated)
+```text
 
 [
   {
@@ -98,30 +99,32 @@ Example: prompts/example_prompts.json (auto-generated)
   }
 ]
 
+```
+
 
 Common tips & troubleshooting
 -----------------------------
-• JSON didn’t appear after pushing?
+- JSON didn’t appear after pushing?
   - Check the “Actions” tab to confirm the workflow ran successfully.
   - Ensure your CSV is under prompts/ and has the .csv extension.
   - Confirm the workflow file exists at .github/workflows/convert-csv-to-json.yml.
 
-• CSV parsing errors?
+- CSV parsing errors?
   - Make sure fields with commas or newlines are quoted.
   - Keep a header row; column names become JSON keys.
   - Remove stray Unicode characters or hidden columns from spreadsheet tools.
 
-• Pull request behavior:
+- Pull request behavior:
   - The workflow runs and validates conversion on PRs.
   - Auto-commit of JSON is disabled for PR events; the JSON commit happens only on push to main.
 
-• Do not manually edit .json files:
+- Do not manually edit .json files:
   - They are generated artifacts. Always change the CSV and let the workflow regenerate JSON.
 
 
 Extending the template
 ----------------------
-• Add more columns to your CSV (e.g., “domain”, “difficulty”, “last_updated”).
-• Post-process JSON (e.g., combine multiple CSVs, validate schema).
-• Publish the JSON to a branch, release asset, or package registry.
-• Add a simple viewer app that loads prompts/*.json for workshop demos. (iOS Shortcuts as an example)
+- Add more columns to your CSV (e.g., “domain”, “difficulty”, “last_updated”).
+- Post-process JSON (e.g., combine multiple CSVs, validate schema).
+- Publish the JSON to a branch, release asset, or package registry.
+- Add a simple viewer app that loads prompts/*.json for workshop demos. (iOS Shortcuts as an example)
