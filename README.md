@@ -24,7 +24,7 @@ Who this is for
 
 Repo structure
 --------------
-.
+```text
 ├─ prompts/
 │  ├─ example_prompts.csv       # Your prompt catalog (you add more CSVs here)
 │  └─ example_prompts.json      # Auto-generated from the CSV (do not hand-edit)
@@ -33,6 +33,7 @@ Repo structure
 └─ .github/
    └─ workflows/
       └─ convert-csv-to-json.yml  # GitHub Action that converts CSV → JSON
+```
 
 
 How the automation works
