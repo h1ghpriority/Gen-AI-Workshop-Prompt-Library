@@ -177,6 +177,19 @@
       }
     });
 
+    const copyMD = el("button", {class:"btn", title:"Copy as Markdown"}, "Copy MD");
+copyMD.addEventListener("click", async () => {
+  const md = `### ${item.title}\n**${item.category}**\n\n${item.text}\n`;
+  await navigator.clipboard.writeText(md);
+  copyMD.textContent = "Copied MD!";
+  setTimeout(()=> copyMD.textContent="Copy MD", 900);
+});
+const actions = el("div", {class:"actions"},
+  fav,
+  el("span",{class:"badge"}, `${item.text.length} chars`),
+  link, copyMD, copy
+);
+
     const actions = el("div", {class:"actions"},
       fav,
       el("span",{class:"badge"}, `${item.text.length} chars`),
@@ -280,12 +293,18 @@
   $("#q").addEventListener("input", debounce(()=>{ cursor=0; filterAndRender(); }, 120));
   $("#reload").addEventListener("click", (e)=>{ e.preventDefault(); loadData(true); });
 
-  $("#copyMD").onclick = async () => {
-    const {q, set} = currentQueryFilteredSet();
-    const md = set.map(r => `### ${r.title}\n**${r.category}**\n\n${r.text}\n`).join("\n");
-    await navigator.clipboard.writeText(md);
-    $("#copyMD").textContent="Copied MD"; setTimeout(()=>$("#copyMD").textContent="Copy as Markdown",900);
-  };
+$("#copyMD").onclick = async () => {
+  const item = currentSet[cursor];      // <- only the selected card
+  if (!item) {
+    $("#copyMD").textContent = "No selection";
+    setTimeout(()=>$("#copyMD").textContent="Copy as Markdown", 900);
+    return;
+  }
+  const md = `### ${item.title}\n**${item.category}**\n\n${item.text}\n`;
+  await navigator.clipboard.writeText(md);
+  $("#copyMD").textContent = "Copied MD";
+  setTimeout(()=>$("#copyMD").textContent="Copy as Markdown", 900);
+};
 
   $("#share").onclick = async () => {
     // include currently selected card id in the URL
