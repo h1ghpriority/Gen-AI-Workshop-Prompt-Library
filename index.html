@@ -8,14 +8,25 @@
   <style>
     :root { --bg:#0b0d10; --panel:#12161c; --muted:#a7b0be; --text:#e8edf3; --accent:#5ac8fa; --border:#1f2630;}
     html,body {margin:0; height:100%; background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";}
-    .app {display:grid; grid-template-columns: 260px 1fr; gap:0; height:100%;}
-    .sidebar {background:var(--panel); border-right:1px solid var(--border); display:flex; flex-direction:column;}
+    .app {display:grid; grid-template-columns: 300px 1fr; gap:0; height:100%;}
+    .sidebar {background:var(--panel); border-right:1px solid var(--border); display:flex; flex-direction:column; min-width:0;}
     .brand {padding:14px 16px; border-bottom:1px solid var(--border); font-weight:600; letter-spacing:.2px;}
     .controls {padding:10px 12px; border-bottom:1px solid var(--border);}
     .search {width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:#0f1318; color:var(--text); outline:none;}
-    .catlist {overflow:auto; padding:8px 6px;}
+    .sidewrap {overflow:auto; padding:8px 6px; display:flex; flex-direction:column; gap:10px; min-height:0;}
+    .section {border:1px solid var(--border); border-radius:10px; background:#0f1318;}
+    .section h4 {margin:0; padding:10px 12px; font-size:12px; color:var(--muted); border-bottom:1px solid var(--border); letter-spacing:.2px; display:flex; justify-content:space-between; align-items:center; gap:8px;}
+    .h4tools {display:flex; gap:6px; align-items:center;}
+    .tiny {font-size:11px; padding:4px 8px; border:1px solid var(--border); border-radius:999px; background:#10151b; color:var(--muted); cursor:pointer;}
+    .tiny:hover {background:#11161d; color:var(--text);}
+    .favsearch {font-size:12px; padding:6px 8px; border:1px solid var(--border); border-radius:8px; background:#10151b; color:var(--text); width:108px;}
+    .catlist, .favlist {max-height:40vh; overflow:auto; padding:8px 6px;}
     .catbtn {display:block; width:100%; text-align:left; border:0; background:transparent; color:var(--muted); padding:10px 12px; border-radius:8px; cursor:pointer;}
-    .catbtn.active, .catbtn:hover {background:#0f1318; color:var(--text);}
+    .catbtn.active, .catbtn:hover {background:#11161d; color:var(--text);}
+    .favitem {display:flex; align-items:center; gap:8px; width:100%; text-align:left; border:0; background:transparent; color:var(--muted); padding:8px 10px; border-radius:8px; cursor:pointer;}
+    .favitem:hover {background:#11161d; color:var(--text);}
+    .favitem .title {flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+    .favitem .cat {font-size:11px; color:var(--muted);}
     .main {display:flex; flex-direction:column; min-width:0;}
     .topbar {display:flex; gap:8px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); flex-wrap:wrap;}
     .pill {padding:6px 10px; border:1px solid var(--border); border-radius:999px; background:#0f1318; color:var(--muted); font-size:12px; cursor:pointer;}
@@ -34,7 +45,7 @@
     .footer {padding:10px 14px; border-top:1px solid var(--border); color:var(--muted); font-size:12px; display:flex; justify-content:space-between;}
     .muted {color:var(--muted);}
     .hl {background: rgba(90,200,250,.18); padding:0 2px; border-radius:3px;}
-    @media (max-width: 860px){ .app{ grid-template-columns: 1fr; } .sidebar{ display:none; } }
+    @media (max-width: 980px){ .app{ grid-template-columns: 1fr; } .sidebar{ display:none; } }
   </style>
 </head>
 <body>
@@ -44,7 +55,29 @@
     <div class="controls">
       <input id="q" class="search" placeholder="Search title or text…" autofocus />
     </div>
-    <div id="cats" class="catlist"></div>
+    <div class="sidewrap">
+      <div class="section">
+        <h4>
+          <span>Categories</span>
+          <span id="catCount" class="muted"></span>
+        </h4>
+        <div id="cats" class="catlist"></div>
+      </div>
+      <div class="section">
+        <h4>
+          <span>★ Favorites</span>
+          <span class="h4tools">
+            <input id="favSearch" class="favsearch" placeholder="Search…" />
+            <button id="favExport" class="tiny" title="Export favorites to JSON">Export</button>
+            <button id="favImport" class="tiny" title="Import favorites from JSON">Import</button>
+            <button id="favClear"  class="tiny" title="Unstar all favorites">Unstar all</button>
+            <span id="favCount" class="muted"></span>
+          </span>
+        </h4>
+        <input id="favFile" type="file" accept="application/json" style="display:none" />
+        <div id="favlist" class="favlist"></div>
+      </div>
+    </div>
   </aside>
 
   <main class="main">
@@ -52,6 +85,7 @@
       <span id="status" class="pill" aria-live="polite">Loading…</span>
       <span id="count" class="pill">0 results</span>
       <span id="activeCat" class="pill">All categories</span>
+      <button id="onlyFavs" class="pill" title="Toggle favorites view">All items</button>
       <button id="copyMD" class="pill" title="Copy selected as Markdown">Copy as Markdown</button>
       <span class="pill">Tip: ↑/↓ select • Enter copies • Shift+Enter copies MD</span>
       <button id="share" class="pill" title="Copy permalink of current state">Share</button>
@@ -75,6 +109,8 @@
   let flat = [];               // [{category, title, text, tags?, syn?}]
   let activeCategory = "All";
   let favorites = new Set(JSON.parse(localStorage.getItem("prompt_favs") || "[]"));
+  let onlyFavs = false;
+  let favSearch = "";          // search term for favorites quick list
   let cursor = 0, currentSet = []; // for keyboard nav
 
   // === PWA ===
@@ -106,6 +142,12 @@
     }catch{ return hay; }
   }
 
+  function download(name, content, type="application/json"){
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([content], {type}));
+    a.download = name; a.click(); URL.revokeObjectURL(a.href);
+  }
+
   // Permalinks
   function setURLState({cat, q, id}) {
     const u = new URL(location);
@@ -121,11 +163,14 @@
              id: u.searchParams.get("id") || "" };
   }
 
-  function persistFavs(){ localStorage.setItem("prompt_favs", JSON.stringify([...favorites])); }
+  function persistFavs(){
+    localStorage.setItem("prompt_favs", JSON.stringify([...favorites]));
+  }
 
-  // === RENDER ===
+  // === RENDER — Categories ===
   function renderCategories(){
     const cats = ["All", ...Object.keys(library).sort()];
+    $("#catCount").textContent = `${cats.length-1}`;
     const wrap = $("#cats"); wrap.innerHTML = "";
     cats.forEach(cat => {
       const b = el("button", {class:`catbtn ${cat===activeCategory?"active":""}`, title:`Filter: ${cat}`}, cat);
@@ -139,6 +184,54 @@
     });
   }
 
+  // === RENDER — Favorites quick list ===
+  function renderFavorites(){
+    const list = $("#favlist"); list.innerHTML = "";
+    const items = flat
+      .filter(p => favorites.has(`${p.category}::${p.title}`))
+      .filter(p => {
+        if (!favSearch) return true;
+        const s = favSearch.toLowerCase();
+        return p.title.toLowerCase().includes(s) || p.category.toLowerCase().includes(s);
+      });
+
+    $("#favCount").textContent = items.length ? items.length : "";
+
+    if (!items.length){
+      list.innerHTML = `<div class="muted" style="padding:8px 10px;">No favorites${favSearch ? " match your search." : " yet. Click ☆ on a card."}</div>`;
+      return;
+    }
+
+    items.sort((a,b)=> a.category.localeCompare(b.category) || a.title.localeCompare(b.title));
+    items.slice(0,150).forEach(p=>{
+      const id = `${p.category}::${p.title}`;
+      const btn = el("button",{class:"favitem", title:`Jump to: ${p.title}`},
+        el("span",{class:"cat"}, "★"),
+        el("span",{class:"title"}, p.title),
+        el("span",{class:"cat"}, p.category)
+      );
+      btn.addEventListener("click", ()=> jumpToFavorite(id));
+      list.append(btn);
+    });
+  }
+
+  function jumpToFavorite(id){
+    const item = flat.find(x => `${x.category}::${x.title}` === id);
+    if(!item) return;
+    activeCategory = item.category;
+    $("#activeCat").textContent = activeCategory + " category";
+    $("#q").value = ""; // ensure visibility
+    setURLState({cat: activeCategory, q:"", id});
+    filterAndRender();
+
+    const idx = currentSet.findIndex(x => `${x.category}::${x.title}` === id);
+    if (idx >= 0){
+      cursor = idx; filterAndRender();
+      document.querySelector(`[data-id="${id}"]`)?.scrollIntoView({block:"center"});
+    }
+  }
+
+  // === RENDER — Cards ===
   function card(item, query, isSelected){
     const id = `${item.category}::${item.title}`;
     const isFav = favorites.has(id);
@@ -156,6 +249,8 @@
       persistFavs();
       fav.classList.toggle("active");
       fav.textContent = fav.classList.contains("active") ? "★ Favorite" : "☆ Favorite";
+      if (onlyFavs) filterAndRender();
+      renderFavorites();
     });
 
     const link = el("button", {class:"btn", title:"Copy permalink"}, "Link");
@@ -194,6 +289,7 @@
     return c;
   }
 
+  // === FILTER & RENDER ===
   function currentQueryFilteredSet(){
     const q = $("#q").value.trim().toLowerCase();
     let set = flat;
@@ -202,14 +298,14 @@
       const t = x.title.toLowerCase(), b = x.text.toLowerCase();
       return t.includes(q) || b.includes(q);
     });
+    if (onlyFavs) set = set.filter(x => favorites.has(`${x.category}::${x.title}`));
     return {q, set};
   }
 
   function filterAndRender(){
     const {q, set} = currentQueryFilteredSet();
-    currentSet = set.slice(); // for keyboard nav
+    currentSet = set.slice();
 
-    // clamp cursor to valid range
     if (currentSet.length === 0) cursor = 0;
     else cursor = Math.max(0, Math.min(cursor, currentSet.length - 1));
 
@@ -217,7 +313,6 @@
     const grid = $("#grid"); grid.innerHTML = "";
     set.forEach((item, i) => grid.append(card(item, q, i===cursor)));
 
-    // Update URL (no specific card id unless shared)
     setURLState({cat: activeCategory, q});
   }
 
@@ -238,7 +333,6 @@
         if (!data) throw new Error("No cache available");
       }
 
-      // Normalize shapes
       library = {};
       if (Array.isArray(data)) {
         for (const row of data){
@@ -250,7 +344,6 @@
         library = data;
       }
 
-      // Flatten
       flat = [];
       for (const [cat, arr] of Object.entries(library)){
         (arr||[]).forEach(p => flat.push({
@@ -260,15 +353,14 @@
       }
 
       renderCategories();
+      renderFavorites();
 
-      // Apply URL state
       const s = getURLState();
       activeCategory = s.cat || "All";
       $("#activeCat").textContent = activeCategory + " category";
       $("#q").value = s.q || "";
       filterAndRender();
 
-      // If deep-linked to an id, try to scroll and highlight nearest
       if (s.id) {
         const idx = currentSet.findIndex(x => `${x.category}::${x.title}` === s.id);
         if (idx >= 0) { cursor = idx; filterAndRender(); document.querySelector(`[data-id="${s.id}"]`)?.scrollIntoView({block:"center"}); }
@@ -291,6 +383,63 @@
   // === EVENTS ===
   $("#q").addEventListener("input", debounce(()=>{ cursor=0; filterAndRender(); }, 120));
   $("#reload").addEventListener("click", (e)=>{ e.preventDefault(); loadData(true); });
+
+  // Favorites-only toggle
+  $("#onlyFavs").onclick = () => {
+    onlyFavs = !onlyFavs;
+    $("#onlyFavs").textContent = onlyFavs ? "Favorites only" : "All items";
+    cursor = 0;
+    filterAndRender();
+  };
+
+  // Favorites search (sidebar)
+  $("#favSearch").addEventListener("input", debounce((e)=>{
+    favSearch = e.target.value.trim();
+    renderFavorites();
+  }, 120));
+
+  // Export favorites
+  $("#favExport").onclick = () => {
+    const ids = [...favorites];
+    const payload = JSON.stringify({version:1, items: ids}, null, 2);
+    download("favorites.json", payload);
+  };
+
+  // Import favorites
+  $("#favImport").onclick = () => $("#favFile").click();
+  $("#favFile").addEventListener("change", async (e)=>{
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try{
+      const text = await file.text();
+      let data = JSON.parse(text);
+      let ids = [];
+      if (Array.isArray(data)) ids = data;
+      else if (data && Array.isArray(data.items)) ids = data.items;
+      else throw new Error("Invalid favorites file.");
+      // normalize & merge
+      ids.forEach(id => { if (typeof id === "string" && id.includes("::")) favorites.add(id); });
+      persistFavs();
+      renderFavorites();
+      if (onlyFavs) { cursor = 0; filterAndRender(); }
+      $("#status").textContent = `Imported ${ids.length} favorite(s)`; setTimeout(()=> $("#status").textContent="Ready", 1200);
+    } catch(err){
+      alert("Import failed: " + err.message);
+    } finally {
+      e.target.value = ""; // reset input
+    }
+  });
+
+  // Unstar all (with confirm)
+  $("#favClear").onclick = () => {
+    if (!favorites.size) return;
+    const sure = confirm(`Unstar all ${favorites.size} favorite(s)?`);
+    if (!sure) return;
+    favorites = new Set();
+    persistFavs();
+    renderFavorites();
+    if (onlyFavs) { cursor = 0; filterAndRender(); }
+  };
 
   // Copy as Markdown — selected only
   $("#copyMD").onclick = async () => {
