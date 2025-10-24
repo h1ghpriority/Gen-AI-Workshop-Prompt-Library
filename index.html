@@ -16,7 +16,7 @@
     .sidewrap {overflow:auto; padding:8px 6px; display:flex; flex-direction:column; gap:10px; min-height:0;}
     .section {border:1px solid var(--border); border-radius:10px; background:#0f1318;}
     .section h4 {margin:0; padding:10px 12px; font-size:12px; color:var(--muted); border-bottom:1px solid var(--border); letter-spacing:.2px; display:flex; justify-content:space-between; align-items:center; gap:8px;}
-    .h4tools {display:flex; gap:6px; align-items:center;}
+    .h4tools {display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
     .tiny {font-size:11px; padding:4px 8px; border:1px solid var(--border); border-radius:999px; background:#10151b; color:var(--muted); cursor:pointer;}
     .tiny:hover {background:#11161d; color:var(--text);}
     .favsearch {font-size:12px; padding:6px 8px; border:1px solid var(--border); border-radius:8px; background:#10151b; color:var(--text); width:108px;}
@@ -27,6 +27,10 @@
     .favitem:hover {background:#11161d; color:var(--text);}
     .favitem .title {flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
     .favitem .cat {font-size:11px; color:var(--muted);}
+    .gistpanel {display:grid; grid-template-columns: 1fr auto; gap:6px; padding:8px 10px;}
+    .gistpanel .row {grid-column: 1 / -1; display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
+    .gistpanel input[type="password"], .gistpanel input[type="text"], .gistpanel input[type="number"] {width:auto; padding:6px 8px; border:1px solid var(--border); border-radius:8px; background:#10151b; color:var(--text);}
+    .note {font-size:11px; color:var(--muted);}
     .main {display:flex; flex-direction:column; min-width:0;}
     .topbar {display:flex; gap:8px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); flex-wrap:wrap;}
     .pill {padding:6px 10px; border:1px solid var(--border); border-radius:999px; background:#0f1318; color:var(--muted); font-size:12px; cursor:pointer;}
@@ -46,6 +50,7 @@
     .muted {color:var(--muted);}
     .hl {background: rgba(90,200,250,.18); padding:0 2px; border-radius:3px;}
     @media (max-width: 980px){ .app{ grid-template-columns: 1fr; } .sidebar{ display:none; } }
+    label {font-size:12px; color:var(--muted);}
   </style>
 </head>
 <body>
@@ -63,6 +68,7 @@
         </h4>
         <div id="cats" class="catlist"></div>
       </div>
+
       <div class="section">
         <h4>
           <span>★ Favorites</span>
@@ -76,6 +82,39 @@
         </h4>
         <input id="favFile" type="file" accept="application/json" style="display:none" />
         <div id="favlist" class="favlist"></div>
+      </div>
+
+      <div class="section">
+        <h4>
+          <span>☁️ Gist Sync</span>
+          <span class="h4tools"><span id="gistStatus" class="note"></span></span>
+        </h4>
+        <div class="gistpanel">
+          <div class="row">
+            <input id="ghToken" type="password" placeholder="GitHub token with gist scope" />
+            <button id="saveToken" class="tiny">Connect</button>
+            <button id="clearToken" class="tiny">Disconnect</button>
+          </div>
+          <div class="row">
+            <input id="gistId" type="text" placeholder="Gist ID (optional — set on first sync)" />
+            <button id="syncGist" class="tiny">Sync to Gist</button>
+            <button id="pullGist" class="tiny">Pull from Gist</button>
+          </div>
+          <div class="row" style="gap:10px;">
+            <label><input id="mergeBeforePush" type="checkbox"> Pull-then-merge before push</label>
+            <label><input id="preferLocalDeletes" type="checkbox"> Prefer local deletions</label>
+          </div>
+          <div class="row">
+            <label><input id="autoSyncChange" type="checkbox"> Auto-sync on change</label>
+            <label> Every <input id="autoSyncEvery" type="number" min="1" step="1" value="15" style="width:64px"> min</label>
+            <button id="startAuto" class="tiny">Start</button>
+            <button id="stopAuto" class="tiny">Stop</button>
+            <span id="autoSyncStatus" class="note"></span>
+          </div>
+          <div class="row note">
+            Token, Gist ID & settings are stored in <code>localStorage</code>. File: <code>favorites.json</code>.
+          </div>
+        </div>
       </div>
     </div>
   </aside>
@@ -103,68 +142,49 @@
 <script>
   // === CONFIG ===
   const DATA_URL = "https://raw.githubusercontent.com/h1ghpriority/Gen-AI-Workshop-Prompt-Library/main/prompts/Generative%20AI%20Prompt%20Library.json";
+  const GIST_FILENAME = "favorites.json";
 
   // === STATE ===
-  let library = {};            // { category: [ {title, text} ] }
-  let flat = [];               // [{category, title, text, tags?, syn?}]
+  let library = {};
+  let flat = [];
   let activeCategory = "All";
   let favorites = new Set(JSON.parse(localStorage.getItem("prompt_favs") || "[]"));
   let onlyFavs = false;
-  let favSearch = "";          // search term for favorites quick list
-  let cursor = 0, currentSet = []; // for keyboard nav
+  let favSearch = "";
+  let cursor = 0, currentSet = [];
+
+  // Gist auth/state
+  let GH_TOKEN = localStorage.getItem("gh_token") || "";
+  let GIST_ID  = localStorage.getItem("gh_gist_id") || "";
+
+  // Auto/merge settings
+  let AUTO_SYNC_ON_CHANGE   = localStorage.getItem("gh_auto_change") === "1";
+  let AUTO_SYNC_EVERY_MIN   = parseInt(localStorage.getItem("gh_auto_every") || "15", 10);
+  let MERGE_BEFORE_PUSH     = (localStorage.getItem("gh_merge_before") ?? "1") === "1";   // default ON
+  let PREFER_LOCAL_DELETES  = localStorage.getItem("gh_prefer_local") === "1";           // default OFF
+  let autoSyncTimer = null;
 
   // === PWA ===
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js");
-  }
+  if ("serviceWorker" in navigator) { navigator.serviceWorker.register("sw.js"); }
 
   // === HELPERS ===
   const $ = sel => document.querySelector(sel);
-  const el = (tag, attrs={}, ...kids) => {
-    const e = document.createElement(tag);
-    for (const [k,v] of Object.entries(attrs)) {
-      if (k === "class") e.className = v;
-      else if (k === "html") e.innerHTML = v;
-      else e.setAttribute(k, v);
-    }
-    kids.forEach(k => e.append(k));
-    return e;
-  };
+  const el = (tag, attrs={}, ...kids) => { const e=document.createElement(tag); for (const [k,v] of Object.entries(attrs)){ if(k==="class") e.className=v; else if(k==="html") e.innerHTML=v; else e.setAttribute(k,v);} kids.forEach(k=>e.append(k)); return e; };
   const debounce = (fn, ms=200) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms);} };
   const safe = s => (s ?? "").toString();
+  const download = (name, content, type="application/json") => { const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([content],{type})); a.download=name; a.click(); URL.revokeObjectURL(a.href); };
+  const setStatus = (msg, ms=1200)=>{ $("#status").textContent = msg; if(ms) setTimeout(()=> $("#status").textContent="Ready", ms); };
 
-  function highlight(hay, needle){
-    if(!needle) return hay;
-    try{
-      const esc = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const rx = new RegExp(esc, "ig");
-      return hay.replace(rx, m => `<span class="hl">${m}</span>`);
-    }catch{ return hay; }
-  }
-
-  function download(name, content, type="application/json"){
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([content], {type}));
-    a.download = name; a.click(); URL.revokeObjectURL(a.href);
-  }
+  function highlight(hay, needle){ if(!needle) return hay; try{ const esc = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); const rx = new RegExp(esc, "ig"); return hay.replace(rx, m => `<span class="hl">${m}</span>`);}catch{ return hay; } }
 
   // Permalinks
-  function setURLState({cat, q, id}) {
-    const u = new URL(location);
-    if (cat) u.searchParams.set("cat", cat); else u.searchParams.delete("cat");
-    if (q)   u.searchParams.set("q", q);     else u.searchParams.delete("q");
-    if (id)  u.searchParams.set("id", id);   else u.searchParams.delete("id");
-    history.replaceState(null, "", u);
-  }
-  function getURLState(){
-    const u = new URL(location);
-    return { cat: u.searchParams.get("cat") || "All",
-             q: u.searchParams.get("q")   || "",
-             id: u.searchParams.get("id") || "" };
-  }
+  function setURLState({cat, q, id}){ const u=new URL(location); if(cat) u.searchParams.set("cat",cat); else u.searchParams.delete("cat"); if(q) u.searchParams.set("q",q); else u.searchParams.delete("q"); if(id) u.searchParams.set("id",id); else u.searchParams.delete("id"); history.replaceState(null,"",u); }
+  function getURLState(){ const u=new URL(location); return {cat:u.searchParams.get("cat")||"All", q:u.searchParams.get("q")||"", id:u.searchParams.get("id")||""}; }
 
   function persistFavs(){
     localStorage.setItem("prompt_favs", JSON.stringify([...favorites]));
+    renderFavorites();
+    if (AUTO_SYNC_ON_CHANGE) scheduleDebouncedSync();
   }
 
   // === RENDER — Categories ===
@@ -186,29 +206,19 @@
 
   // === RENDER — Favorites quick list ===
   function renderFavorites(){
-    const list = $("#favlist"); list.innerHTML = "";
+    const list = $("#favlist"); if (!list) return; list.innerHTML = "";
     const items = flat
       .filter(p => favorites.has(`${p.category}::${p.title}`))
-      .filter(p => {
-        if (!favSearch) return true;
-        const s = favSearch.toLowerCase();
-        return p.title.toLowerCase().includes(s) || p.category.toLowerCase().includes(s);
-      });
+      .filter(p => { if (!favSearch) return true; const s=favSearch.toLowerCase(); return p.title.toLowerCase().includes(s) || p.category.toLowerCase().includes(s); });
 
     $("#favCount").textContent = items.length ? items.length : "";
-
-    if (!items.length){
-      list.innerHTML = `<div class="muted" style="padding:8px 10px;">No favorites${favSearch ? " match your search." : " yet. Click ☆ on a card."}</div>`;
-      return;
-    }
+    if (!items.length){ list.innerHTML = `<div class="muted" style="padding:8px 10px;">No favorites${favSearch ? " match your search." : " yet. Click ☆ on a card."}</div>`; return; }
 
     items.sort((a,b)=> a.category.localeCompare(b.category) || a.title.localeCompare(b.title));
     items.slice(0,150).forEach(p=>{
       const id = `${p.category}::${p.title}`;
       const btn = el("button",{class:"favitem", title:`Jump to: ${p.title}`},
-        el("span",{class:"cat"}, "★"),
-        el("span",{class:"title"}, p.title),
-        el("span",{class:"cat"}, p.category)
+        el("span",{class:"cat"}, "★"), el("span",{class:"title"}, p.title), el("span",{class:"cat"}, p.category)
       );
       btn.addEventListener("click", ()=> jumpToFavorite(id));
       list.append(btn);
@@ -216,19 +226,11 @@
   }
 
   function jumpToFavorite(id){
-    const item = flat.find(x => `${x.category}::${x.title}` === id);
-    if(!item) return;
-    activeCategory = item.category;
-    $("#activeCat").textContent = activeCategory + " category";
-    $("#q").value = ""; // ensure visibility
-    setURLState({cat: activeCategory, q:"", id});
-    filterAndRender();
-
+    const item = flat.find(x => `${x.category}::${x.title}` === id); if(!item) return;
+    activeCategory = item.category; $("#activeCat").textContent = activeCategory + " category"; $("#q").value = "";
+    setURLState({cat: activeCategory, q:"", id}); filterAndRender();
     const idx = currentSet.findIndex(x => `${x.category}::${x.title}` === id);
-    if (idx >= 0){
-      cursor = idx; filterAndRender();
-      document.querySelector(`[data-id="${id}"]`)?.scrollIntoView({block:"center"});
-    }
+    if (idx >= 0){ cursor = idx; filterAndRender(); document.querySelector(`[data-id="${id}"]`)?.scrollIntoView({block:"center"}); }
   }
 
   // === RENDER — Cards ===
@@ -236,13 +238,9 @@
     const id = `${item.category}::${item.title}`;
     const isFav = favorites.has(id);
     const c = el("article", {class:`card ${isSelected?"selected":""}`, "data-id": id});
-    c.append(
-      el("h3", {html: highlight(item.title, query)}),
-      el("div", {class:"meta"}, `${item.category}`)
-    );
+    c.append(el("h3", {html: highlight(item.title, query)}), el("div", {class:"meta"}, `${item.category}`));
     c.append(el("pre", {html: highlight(item.text, query)}));
 
-    // Actions
     const fav = el("button", {class:`btn fav ${isFav?"active":""}`, title:"Toggle favorite"}, isFav ? "★ Favorite" : "☆ Favorite");
     fav.addEventListener("click", () => {
       if (favorites.has(id)) favorites.delete(id); else favorites.add(id);
@@ -250,41 +248,18 @@
       fav.classList.toggle("active");
       fav.textContent = fav.classList.contains("active") ? "★ Favorite" : "☆ Favorite";
       if (onlyFavs) filterAndRender();
-      renderFavorites();
     });
 
     const link = el("button", {class:"btn", title:"Copy permalink"}, "Link");
-    link.addEventListener("click", () => {
-      setURLState({cat:item.category, q: $("#q").value, id});
-      navigator.clipboard.writeText(location.href).then(()=>{
-        link.textContent="Linked"; setTimeout(()=> link.textContent="Link", 900);
-      });
-    });
+    link.addEventListener("click", () => { setURLState({cat:item.category, q: $("#q").value, id}); navigator.clipboard.writeText(location.href).then(()=>{ link.textContent="Linked"; setTimeout(()=> link.textContent="Link", 900); }); });
 
     const copyMD = el("button", {class:"btn", title:"Copy as Markdown"}, "Copy MD");
-    copyMD.addEventListener("click", async () => {
-      const md = `### ${item.title}\n**${item.category}**\n\n${item.text}\n`;
-      await navigator.clipboard.writeText(md);
-      copyMD.textContent = "Copied MD!";
-      setTimeout(()=> copyMD.textContent="Copy MD", 900);
-    });
+    copyMD.addEventListener("click", async () => { const md = `### ${item.title}\n**${item.category}**\n\n${item.text}\n`; await navigator.clipboard.writeText(md); copyMD.textContent="Copied MD!"; setTimeout(()=> copyMD.textContent="Copy MD", 900); });
 
     const copy = el("button", {class:"btn", title:"Copy prompt"}, "Copy");
-    copy.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(item.text);
-        copy.textContent = "Copied!";
-        setTimeout(()=> copy.textContent="Copy", 900);
-      } catch (e) {
-        alert("Clipboard failed. If opened as file://, host via HTTPS for best results.");
-      }
-    });
+    copy.addEventListener("click", async () => { try { await navigator.clipboard.writeText(item.text); copy.textContent="Copied!"; setTimeout(()=> copy.textContent="Copy", 900); } catch { alert("Clipboard failed. If opened as file://, host via HTTPS for best results."); } });
 
-    const actions = el("div", {class:"actions"},
-      fav,
-      el("span",{class:"badge"}, `${item.text.length} chars`),
-      link, copyMD, copy
-    );
+    const actions = el("div", {class:"actions"}, fav, el("span",{class:"badge"}, `${item.text.length} chars`), link, copyMD, copy);
     c.append(actions);
     return c;
   }
@@ -294,10 +269,7 @@
     const q = $("#q").value.trim().toLowerCase();
     let set = flat;
     if (activeCategory !== "All") set = set.filter(x => x.category === activeCategory);
-    if (q) set = set.filter(x => {
-      const t = x.title.toLowerCase(), b = x.text.toLowerCase();
-      return t.includes(q) || b.includes(q);
-    });
+    if (q) set = set.filter(x => x.title.toLowerCase().includes(q) || x.text.toLowerCase().includes(q));
     if (onlyFavs) set = set.filter(x => favorites.has(`${x.category}::${x.title}`));
     return {q, set};
   }
@@ -305,14 +277,9 @@
   function filterAndRender(){
     const {q, set} = currentQueryFilteredSet();
     currentSet = set.slice();
-
-    if (currentSet.length === 0) cursor = 0;
-    else cursor = Math.max(0, Math.min(cursor, currentSet.length - 1));
-
+    if (currentSet.length === 0) cursor = 0; else cursor = Math.max(0, Math.min(cursor, currentSet.length - 1));
     $("#count").textContent = `${set.length} result${set.length===1?"":"s"}`;
-    const grid = $("#grid"); grid.innerHTML = "";
-    set.forEach((item, i) => grid.append(card(item, q, i===cursor)));
-
+    const grid = $("#grid"); grid.innerHTML = ""; set.forEach((item,i)=> grid.append(card(item, q, i===cursor)));
     setURLState({cat: activeCategory, q});
   }
 
@@ -322,182 +289,256 @@
     try{
       let data, from="remote";
       if (remoteFirst){
-        const r = await fetch(DATA_URL, {cache:"no-store"});
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        data = await r.json();
-        localStorage.setItem("prompt_library_cache", JSON.stringify({ts:Date.now(), data}));
+        const r = await fetch(DATA_URL, {cache:"no-store"}); if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        data = await r.json(); localStorage.setItem("prompt_library_cache", JSON.stringify({ts:Date.now(), data}));
       } else {
-        from = "cache";
-        const cached = JSON.parse(localStorage.getItem("prompt_library_cache") || "{}");
-        data = cached.data;
-        if (!data) throw new Error("No cache available");
+        from = "cache"; const cached = JSON.parse(localStorage.getItem("prompt_library_cache") || "{}"); data = cached.data; if (!data) throw new Error("No cache available");
       }
-
       library = {};
-      if (Array.isArray(data)) {
-        for (const row of data){
-          const cat = safe(row.category) || "Uncategorized";
-          library[cat] ??= [];
-          library[cat].push({title: safe(row.title)||"(Untitled)", text: safe(row.text)||""});
-        }
-      } else {
-        library = data;
-      }
+      if (Array.isArray(data)) for (const row of data){ const cat = safe(row.category) || "Uncategorized"; (library[cat] ??= []).push({title: safe(row.title)||"(Untitled)", text: safe(row.text)||""}); }
+      else library = data;
 
-      flat = [];
-      for (const [cat, arr] of Object.entries(library)){
-        (arr||[]).forEach(p => flat.push({
-          category: cat, title: safe(p.title)||"(Untitled)", text: safe(p.text)||"",
-          tags: p.tags||[], syn: p.syn||[]
-        }));
-      }
+      flat = []; for (const [cat, arr] of Object.entries(library)){ (arr||[]).forEach(p => flat.push({category:cat, title:safe(p.title)||"(Untitled)", text:safe(p.text)||"", tags:p.tags||[], syn:p.syn||[]})); }
+      renderCategories(); renderFavorites();
 
-      renderCategories();
-      renderFavorites();
-
-      const s = getURLState();
-      activeCategory = s.cat || "All";
-      $("#activeCat").textContent = activeCategory + " category";
-      $("#q").value = s.q || "";
-      filterAndRender();
-
-      if (s.id) {
-        const idx = currentSet.findIndex(x => `${x.category}::${x.title}` === s.id);
-        if (idx >= 0) { cursor = idx; filterAndRender(); document.querySelector(`[data-id="${s.id}"]`)?.scrollIntoView({block:"center"}); }
-      }
-
-      const when = new Date().toLocaleString();
-      $("#lastSync").textContent = `Synced ${when} (${from})`;
-      $("#status").textContent = "Ready";
+      const s = getURLState(); activeCategory = s.cat || "All"; $("#activeCat").textContent = activeCategory + " category"; $("#q").value = s.q || ""; filterAndRender();
+      if (s.id){ const idx = currentSet.findIndex(x => `${x.category}::${x.title}` === s.id); if (idx >= 0){ cursor = idx; filterAndRender(); document.querySelector(`[data-id="${s.id}"]`)?.scrollIntoView({block:"center"}); } }
+      const when = new Date().toLocaleString(); $("#lastSync").textContent = `Synced ${when} (${from})`; $("#status").textContent = "Ready";
     } catch (e){
       console.error(e);
-      if (remoteFirst){
-        $("#status").textContent = "Offline mode (cached)";
-        try { await loadData(false); return; } catch {}
-      }
-      $("#status").textContent = "Load failed";
-      $("#grid").innerHTML = `<div class="muted">Could not load data. Check DATA_URL or your network.</div>`;
+      if (remoteFirst){ $("#status").textContent = "Offline mode (cached)"; try { await loadData(false); return; } catch {} }
+      $("#status").textContent = "Load failed"; $("#grid").innerHTML = `<div class="muted">Could not load data. Check DATA_URL or your network.</div>`;
     }
+  }
+
+  // === GIST SYNC ===
+  function refreshGistUI(){
+    $("#ghToken").value = GH_TOKEN ? "••••••••••••" : "";
+    $("#gistId").value = GIST_ID || "";
+    $("#gistStatus").innerHTML = GIST_ID ? `Gist: <a href="https://gist.github.com/${GIST_ID}" target="_blank" rel="noopener" style="color:var(--muted); text-decoration: none;">${GIST_ID.slice(0,7)}…</a>` : "Not connected";
+    $("#autoSyncChange").checked = AUTO_SYNC_ON_CHANGE;
+    $("#autoSyncEvery").value = isNaN(AUTO_SYNC_EVERY_MIN) || AUTO_SYNC_EVERY_MIN < 1 ? 15 : AUTO_SYNC_EVERY_MIN;
+    $("#mergeBeforePush").checked = MERGE_BEFORE_PUSH;
+    $("#preferLocalDeletes").checked = PREFER_LOCAL_DELETES;
+    updateAutoSyncStatus();
+  }
+
+  async function githubFetch(path, opts={}){
+    if (!GH_TOKEN) throw new Error("Missing GitHub token.");
+    const r = await fetch(`https://api.github.com${path}`, {
+      ...opts,
+      headers: {
+        "Accept": "application/vnd.github+json",
+        "Authorization": `Bearer ${GH_TOKEN}`,
+        ...(opts.headers||{})
+      }
+    });
+    if (!r.ok){
+      const msg = await r.text().catch(()=> ""); throw new Error(`GitHub API ${r.status}: ${msg || r.statusText}`);
+    }
+    return r.json();
+  }
+
+  async function fetchRemoteFavorites(){
+    if (!GIST_ID) return new Set();
+    const res = await githubFetch(`/gists/${GIST_ID}`);
+    const file = res.files?.[GIST_FILENAME];
+    if (!file || !file.content) return new Set();
+    const parsed = JSON.parse(file.content);
+    const ids = Array.isArray(parsed) ? parsed : (parsed?.items || []);
+    return new Set(ids.filter(x => typeof x === "string" && x.includes("::")));
+  }
+
+  function computeMergedFavorites(localSet, remoteSet){
+    if (PREFER_LOCAL_DELETES){
+      // Strict local authority: keep exactly local favorites (ignore remote-only entries)
+      return new Set(localSet);
+    }
+    // Default: union to avoid losing adds from other devices
+    return new Set([...remoteSet, ...localSet]);
+  }
+
+  async function createOrUpdateGist(){
+    // Optionally pull-then-merge
+    if (MERGE_BEFORE_PUSH){
+      const remoteSet = await fetchRemoteFavorites();
+      const merged = computeMergedFavorites(favorites, remoteSet);
+      // If union added anything new locally, persist so UI reflects merged state
+      const before = favorites.size;
+      favorites = merged;
+      if (favorites.size !== before) persistFavs();
+    }
+
+    const items = [...favorites];
+    const payload = JSON.stringify({version:1, items}, null, 2);
+
+    if (!GIST_ID){
+      const body = { description: "Prompt Library favorites (synced)", public: false, files: { [GIST_FILENAME]: { content: payload } } };
+      const res = await githubFetch("/gists", { method:"POST", body: JSON.stringify(body) });
+      GIST_ID = res.id; localStorage.setItem("gh_gist_id", GIST_ID); refreshGistUI(); setStatus("Created Gist & synced");
+      return;
+    }
+    const body = { files: { [GIST_FILENAME]: { content: payload } } };
+    await githubFetch(`/gists/${GIST_ID}`, { method:"PATCH", body: JSON.stringify(body) });
+    setStatus("Synced to Gist");
+  }
+
+  async function pullFromGist(){
+    if (!GIST_ID) throw new Error("No Gist ID set.");
+    const remoteSet = await fetchRemoteFavorites();
+    let added = 0;
+    remoteSet.forEach(id => { if (!favorites.has(id)) { favorites.add(id); added++; }});
+    persistFavs(); if (onlyFavs) { cursor = 0; filterAndRender(); }
+    setStatus(`Pulled ${added} new favorite(s)`);
+  }
+
+  // Debounced auto-sync (on change)
+  const scheduleDebouncedSync = debounce(async ()=>{
+    if (!GH_TOKEN) { setStatus("Auto-sync skipped: no token", 1000); return; }
+    try { await createOrUpdateGist(); } catch (e) { console.error(e); setStatus("Auto-sync failed"); }
+  }, 1500);
+
+  // Interval auto-sync
+  function updateAutoSyncStatus(){
+    const on = !!autoSyncTimer;
+    $("#autoSyncStatus").textContent = on ? `Auto-sync every ${AUTO_SYNC_EVERY_MIN} min` : "Auto-sync off";
+  }
+  function startAutoSyncInterval(){
+    const mins = parseInt($("#autoSyncEvery").value || "15", 10);
+    AUTO_SYNC_EVERY_MIN = isNaN(mins) || mins < 1 ? 15 : mins;
+    localStorage.setItem("gh_auto_every", String(AUTO_SYNC_EVERY_MIN));
+    if (autoSyncTimer) clearInterval(autoSyncTimer);
+    if (!GH_TOKEN){ alert("Connect your GitHub token first."); return; }
+    autoSyncTimer = setInterval(async ()=>{
+      try { await createOrUpdateGist(); } catch(e){ console.error(e); }
+    }, AUTO_SYNC_EVERY_MIN * 60 * 1000);
+    updateAutoSyncStatus();
+    setStatus("Auto-sync started");
+  }
+  function stopAutoSyncInterval(){
+    if (autoSyncTimer) { clearInterval(autoSyncTimer); autoSyncTimer = null; }
+    updateAutoSyncStatus();
+    setStatus("Auto-sync stopped");
   }
 
   // === EVENTS ===
   $("#q").addEventListener("input", debounce(()=>{ cursor=0; filterAndRender(); }, 120));
   $("#reload").addEventListener("click", (e)=>{ e.preventDefault(); loadData(true); });
 
-  // Favorites-only toggle
-  $("#onlyFavs").onclick = () => {
-    onlyFavs = !onlyFavs;
-    $("#onlyFavs").textContent = onlyFavs ? "Favorites only" : "All items";
-    cursor = 0;
-    filterAndRender();
-  };
+  $("#onlyFavs").onclick = () => { onlyFavs = !onlyFavs; $("#onlyFavs").textContent = onlyFavs ? "Favorites only" : "All items"; cursor = 0; filterAndRender(); };
 
-  // Favorites search (sidebar)
-  $("#favSearch").addEventListener("input", debounce((e)=>{
-    favSearch = e.target.value.trim();
-    renderFavorites();
-  }, 120));
-
-  // Export favorites
-  $("#favExport").onclick = () => {
-    const ids = [...favorites];
-    const payload = JSON.stringify({version:1, items: ids}, null, 2);
-    download("favorites.json", payload);
-  };
-
-  // Import favorites
+  // Favorites tools
+  $("#favSearch").addEventListener("input", debounce((e)=>{ favSearch = e.target.value.trim(); renderFavorites(); }, 120));
+  $("#favExport").onclick = () => { const ids=[...favorites]; const payload=JSON.stringify({version:1, items:ids}, null, 2); download("favorites.json", payload); };
   $("#favImport").onclick = () => $("#favFile").click();
   $("#favFile").addEventListener("change", async (e)=>{
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try{
-      const text = await file.text();
-      let data = JSON.parse(text);
-      let ids = [];
-      if (Array.isArray(data)) ids = data;
-      else if (data && Array.isArray(data.items)) ids = data.items;
-      else throw new Error("Invalid favorites file.");
-      // normalize & merge
-      ids.forEach(id => { if (typeof id === "string" && id.includes("::")) favorites.add(id); });
-      persistFavs();
-      renderFavorites();
-      if (onlyFavs) { cursor = 0; filterAndRender(); }
-      $("#status").textContent = `Imported ${ids.length} favorite(s)`; setTimeout(()=> $("#status").textContent="Ready", 1200);
-    } catch(err){
-      alert("Import failed: " + err.message);
-    } finally {
-      e.target.value = ""; // reset input
-    }
+    const file = e.target.files?.[0]; if (!file) return;
+    try{ const text = await file.text(); const data = JSON.parse(text); const ids = Array.isArray(data)? data : (data?.items||[]); let added=0; ids.forEach(id=>{ if(typeof id==="string"&&id.includes("::")&&!favorites.has(id)){ favorites.add(id); added++; }}); persistFavs(); if (onlyFavs){ cursor=0; filterAndRender(); } setStatus(`Imported ${added} new favorite(s)`); }
+    catch(err){ alert("Import failed: " + err.message); }
+    finally{ e.target.value=""; }
   });
-
-  // Unstar all (with confirm)
-  $("#favClear").onclick = () => {
-    if (!favorites.size) return;
-    const sure = confirm(`Unstar all ${favorites.size} favorite(s)?`);
-    if (!sure) return;
-    favorites = new Set();
-    persistFavs();
-    renderFavorites();
-    if (onlyFavs) { cursor = 0; filterAndRender(); }
-  };
+  $("#favClear").onclick = () => { if (!favorites.size) return; const sure = confirm(`Unstar all ${favorites.size} favorite(s)?`); if (!sure) return; favorites = new Set(); persistFavs(); if (onlyFavs){ cursor=0; filterAndRender(); } };
 
   // Copy as Markdown — selected only
   $("#copyMD").onclick = async () => {
     const item = currentSet[cursor];
-    if (!item) {
-      $("#copyMD").textContent = "No selection";
-      setTimeout(()=>$("#copyMD").textContent="Copy as Markdown", 900);
-      return;
-    }
+    if (!item) { $("#copyMD").textContent = "No selection"; setTimeout(()=>$("#copyMD").textContent="Copy as Markdown", 900); return; }
     const md = `### ${item.title}\n**${item.category}**\n\n${item.text}\n`;
     await navigator.clipboard.writeText(md);
-    $("#copyMD").textContent = "Copied MD";
-    setTimeout(()=>$("#copyMD").textContent="Copy as Markdown", 900);
+    $("#copyMD").textContent = "Copied MD"; setTimeout(()=>$("#copyMD").textContent="Copy as Markdown", 900);
   };
 
   $("#share").onclick = async () => {
     const id = currentSet[cursor] ? `${currentSet[cursor].category}::${currentSet[cursor].title}` : "";
     setURLState({cat: activeCategory, q: $("#q").value, id});
-    try {
-      await navigator.clipboard.writeText(location.href);
-      $("#share").textContent = "Permalink copied"; setTimeout(()=> $("#share").textContent="Share", 1200);
-    } catch {
-      alert("Copied URL may require HTTPS context in some browsers.");
-    }
+    try { await navigator.clipboard.writeText(location.href); $("#share").textContent = "Permalink copied"; setTimeout(()=> $("#share").textContent="Share", 1200); }
+    catch { alert("Copied URL may require HTTPS context in some browsers."); }
   };
 
-  // Keyboard navigation & copy actions
+  // Keyboard nav & copy
   document.addEventListener("keydown", async (e)=>{
     if(e.key==="Escape"){ $("#q").value=""; cursor=0; filterAndRender(); return; }
-
     if(!currentSet.length) return;
+    if(e.key==="ArrowDown"){ e.preventDefault(); cursor=Math.min(cursor+1,currentSet.length-1); filterAndRender(); return; }
+    if(e.key==="ArrowUp"){   e.preventDefault(); cursor=Math.max(cursor-1,0); filterAndRender(); return; }
+    if(e.key==="Enter" && e.shiftKey){ e.preventDefault(); const item=currentSet[cursor]; if(!item) return; const md=`### ${item.title}\n**${item.category}**\n\n${item.text}\n`; await navigator.clipboard.writeText(md); setStatus("Copied selected as Markdown"); return; }
+    if(e.key==="Enter"){ e.preventDefault(); const item=currentSet[cursor]; if(!item) return; await navigator.clipboard.writeText(item.text); setStatus("Copied selected"); return; }
+  });
 
-    if(e.key==="ArrowDown"){ e.preventDefault(); cursor = Math.min(cursor+1, currentSet.length-1); filterAndRender(); return; }
-    if(e.key==="ArrowUp"){   e.preventDefault(); cursor = Math.max(cursor-1, 0);              filterAndRender(); return; }
+  // Gist controls
+  $("#saveToken").onclick = async () => {
+    const raw = $("#ghToken").value.trim();
+    if(!raw || raw === "••••••••••••"){ alert("Paste your GitHub token (with gist scope)."); return; }
+    GH_TOKEN = raw; localStorage.setItem("gh_token", GH_TOKEN);
+    try{ await githubFetch("/user"); setStatus("Connected to GitHub"); $("#ghToken").value = "••••••••••••"; }
+    catch(err){ alert("Token check failed: " + err.message); localStorage.removeItem("gh_token"); GH_TOKEN=""; }
+    refreshGistUI();
+  };
 
-    // Shift+Enter => Copy Markdown of selected
-    if(e.key==="Enter" && e.shiftKey){
-      e.preventDefault();
-      const item = currentSet[cursor];
-      if (!item) return;
-      const md = `### ${item.title}\n**${item.category}**\n\n${item.text}\n`;
-      await navigator.clipboard.writeText(md);
-      $("#status").textContent = "Copied selected as Markdown";
-      setTimeout(()=> $("#status").textContent = "Ready", 1200);
-      return;
-    }
+  $("#clearToken").onclick = () => {
+    GH_TOKEN = ""; GIST_ID = "";
+    localStorage.removeItem("gh_token"); localStorage.removeItem("gh_gist_id");
+    stopAutoSyncInterval();
+    refreshGistUI(); setStatus("Disconnected");
+  };
 
-    // Enter => Copy plain text of selected
-    if(e.key==="Enter"){
-      e.preventDefault();
-      const item = currentSet[cursor];
-      if (!item) return;
-      await navigator.clipboard.writeText(item.text);
-      $("#status").textContent = "Copied selected";
-      setTimeout(()=> $("#status").textContent = "Ready", 1200);
-      return;
+  $("#syncGist").onclick = async () => {
+    try{
+      if(!GH_TOKEN){ alert("Connect your GitHub token first."); return; }
+      const typed = $("#gistId").value.trim(); if (typed) { GIST_ID = typed; localStorage.setItem("gh_gist_id", GIST_ID); }
+      await createOrUpdateGist();
+      $("#gistId").value = GIST_ID;
+      refreshGistUI();
+    }catch(err){ alert("Sync failed: " + err.message); }
+  };
+
+  $("#pullGist").onclick = async () => {
+    try{
+      if(!GH_TOKEN){ alert("Connect your GitHub token first."); return; }
+      const typed = $("#gistId").value.trim(); if (typed) { GIST_ID = typed; localStorage.setItem("gh_gist_id", GIST_ID); }
+      await pullFromGist();
+    }catch(err){ alert("Pull failed: " + err.message); }
+  };
+
+  // Auto-sync settings/events
+  $("#autoSyncChange").addEventListener("change", (e)=>{
+    AUTO_SYNC_ON_CHANGE = e.target.checked;
+    localStorage.setItem("gh_auto_change", AUTO_SYNC_ON_CHANGE ? "1" : "0");
+    setStatus(AUTO_SYNC_ON_CHANGE ? "Auto-sync on change enabled" : "Auto-sync on change disabled");
+  });
+  $("#autoSyncEvery").addEventListener("change", ()=>{
+    const v = parseInt($("#autoSyncEvery").value || "15", 10);
+    AUTO_SYNC_EVERY_MIN = isNaN(v) || v < 1 ? 15 : v;
+    localStorage.setItem("gh_auto_every", String(AUTO_SYNC_EVERY_MIN));
+    if (autoSyncTimer) { startAutoSyncInterval(); } // restart with new interval
+  });
+  $("#startAuto").onclick = startAutoSyncInterval;
+  $("#stopAuto").onclick  = stopAutoSyncInterval;
+
+  // Merge settings
+  $("#mergeBeforePush").addEventListener("change", (e)=>{
+    MERGE_BEFORE_PUSH = e.target.checked;
+    localStorage.setItem("gh_merge_before", MERGE_BEFORE_PUSH ? "1" : "0");
+    setStatus(MERGE_BEFORE_PUSH ? "Pull-then-merge enabled" : "Pull-then-merge disabled");
+  });
+  $("#preferLocalDeletes").addEventListener("change", (e)=>{
+    PREFER_LOCAL_DELETES = e.target.checked;
+    localStorage.setItem("gh_prefer_local", PREFER_LOCAL_DELETES ? "1" : "0");
+    setStatus(PREFER_LOCAL_DELETES ? "Local deletions preferred" : "Union merge preferred");
+  });
+
+  // Helpful: sync when tab becomes visible again (if on-change enabled)
+  document.addEventListener("visibilitychange", ()=>{
+    if (document.visibilityState === "visible" && AUTO_SYNC_ON_CHANGE && GH_TOKEN){
+      scheduleDebouncedSync();
     }
   });
+
+  // Init persisted UI
+  refreshGistUI();
+
+  // Cleanup on unload
+  window.addEventListener("beforeunload", ()=>{ if (autoSyncTimer) clearInterval(autoSyncTimer); });
 
   // === INIT ===
   loadData(true);
