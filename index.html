@@ -15,11 +15,41 @@
     .search {width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:#0f1318; color:var(--text); outline:none;}
     .sidewrap {overflow:auto; padding:8px 6px; display:flex; flex-direction:column; gap:10px; min-height:0;}
     .section {border:1px solid var(--border); border-radius:10px; background:#0f1318;}
-    .section h4 {margin:0; padding:10px 12px; font-size:12px; color:var(--muted); border-bottom:1px solid var(--border); letter-spacing:.2px; display:flex; justify-content:space-between; align-items:center; gap:8px;}
-    .h4tools {display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
-    .tiny {font-size:11px; padding:4px 8px; border:1px solid var(--border); border-radius:999px; background:#10151b; color:var(--muted); cursor:pointer;}
-    .tiny:hover {background:#11161d; color:var(--text);}
-    .favsearch {font-size:12px; padding:6px 8px; border:1px solid var(--border); border-radius:8px; background:#10151b; color:var(--text); width:108px;}
+
+    /* ---- FIX: allow header tools to wrap without clipping ---- */
+    .section h4{
+      margin:0; padding:10px 12px;
+      font-size:12px; color:var(--muted);
+      border-bottom:1px solid var(--border);
+      letter-spacing:.2px;
+      display:flex; align-items:flex-start;
+      justify-content:space-between;
+      gap:8px;
+      flex-wrap:wrap;
+      overflow:visible;
+    }
+    .h4tools{
+      display:flex; gap:6px; align-items:center;
+      flex-wrap:wrap;
+      flex:1 1 100%;    /* drop to next line when tight */
+      min-width:0;
+    }
+    .favsearch{
+      font-size:12px; padding:6px 8px;
+      border:1px solid var(--border); border-radius:8px;
+      background:#10151b; color:var(--text);
+      flex:1 1 120px;   /* flexible width */
+      min-width:0; width:auto; box-sizing:border-box;
+    }
+    .tiny{
+      font-size:11px; padding:4px 8px; border:1px solid var(--border);
+      border-radius:999px; background:#10151b; color:var(--muted); cursor:pointer;
+      flex:0 0 auto;
+    }
+    .tiny:hover{background:#11161d; color:var(--text);}
+    #favCount{ white-space:nowrap; }
+    /* ---------------------------------------------------------- */
+
     .catlist, .favlist {max-height:40vh; overflow:auto; padding:8px 6px;}
     .catbtn {display:block; width:100%; text-align:left; border:0; background:transparent; color:var(--muted); padding:10px 12px; border-radius:8px; cursor:pointer;}
     .catbtn.active, .catbtn:hover {background:#11161d; color:var(--text);}
@@ -160,8 +190,8 @@
   // Auto/merge settings
   let AUTO_SYNC_ON_CHANGE   = localStorage.getItem("gh_auto_change") === "1";
   let AUTO_SYNC_EVERY_MIN   = parseInt(localStorage.getItem("gh_auto_every") || "15", 10);
-  let MERGE_BEFORE_PUSH     = (localStorage.getItem("gh_merge_before") ?? "1") === "1";   // default ON
-  let PREFER_LOCAL_DELETES  = localStorage.getItem("gh_prefer_local") === "1";           // default OFF
+  let MERGE_BEFORE_PUSH     = (localStorage.getItem("gh_merge_before") ?? "1") === "1";
+  let PREFER_LOCAL_DELETES  = localStorage.getItem("gh_prefer_local") === "1";
   let autoSyncTimer = null;
 
   // === PWA ===
@@ -315,7 +345,7 @@
   function refreshGistUI(){
     $("#ghToken").value = GH_TOKEN ? "••••••••••••" : "";
     $("#gistId").value = GIST_ID || "";
-    $("#gistStatus").innerHTML = GIST_ID ? `Gist: <a href="https://gist.github.com/${GIST_ID}" target="_blank" rel="noopener" style="color:var(--muted); text-decoration: none;">${GIST_ID.slice(0,7)}…</a>` : "Not connected";
+    $("#gistStatus").innerHTML = GIST_ID ? `Gist: <a href="https://gist.github.com/${GIST_ID}` + `" target="_blank" rel="noopener" style="color:var(--muted); text-decoration: none;">${GIST_ID.slice(0,7)}…</a>` : "Not connected";
     $("#autoSyncChange").checked = AUTO_SYNC_ON_CHANGE;
     $("#autoSyncEvery").value = isNaN(AUTO_SYNC_EVERY_MIN) || AUTO_SYNC_EVERY_MIN < 1 ? 15 : AUTO_SYNC_EVERY_MIN;
     $("#mergeBeforePush").checked = MERGE_BEFORE_PUSH;
@@ -351,19 +381,15 @@
 
   function computeMergedFavorites(localSet, remoteSet){
     if (PREFER_LOCAL_DELETES){
-      // Strict local authority: keep exactly local favorites (ignore remote-only entries)
       return new Set(localSet);
     }
-    // Default: union to avoid losing adds from other devices
     return new Set([...remoteSet, ...localSet]);
   }
 
   async function createOrUpdateGist(){
-    // Optionally pull-then-merge
     if (MERGE_BEFORE_PUSH){
       const remoteSet = await fetchRemoteFavorites();
       const merged = computeMergedFavorites(favorites, remoteSet);
-      // If union added anything new locally, persist so UI reflects merged state
       const before = favorites.size;
       favorites = merged;
       if (favorites.size !== before) persistFavs();
@@ -510,7 +536,7 @@
     const v = parseInt($("#autoSyncEvery").value || "15", 10);
     AUTO_SYNC_EVERY_MIN = isNaN(v) || v < 1 ? 15 : v;
     localStorage.setItem("gh_auto_every", String(AUTO_SYNC_EVERY_MIN));
-    if (autoSyncTimer) { startAutoSyncInterval(); } // restart with new interval
+    if (autoSyncTimer) { startAutoSyncInterval(); }
   });
   $("#startAuto").onclick = startAutoSyncInterval;
   $("#stopAuto").onclick  = stopAutoSyncInterval;
@@ -527,20 +553,14 @@
     setStatus(PREFER_LOCAL_DELETES ? "Local deletions preferred" : "Union merge preferred");
   });
 
-  // Helpful: sync when tab becomes visible again (if on-change enabled)
   document.addEventListener("visibilitychange", ()=>{
     if (document.visibilityState === "visible" && AUTO_SYNC_ON_CHANGE && GH_TOKEN){
       scheduleDebouncedSync();
     }
   });
 
-  // Init persisted UI
   refreshGistUI();
-
-  // Cleanup on unload
   window.addEventListener("beforeunload", ()=>{ if (autoSyncTimer) clearInterval(autoSyncTimer); });
-
-  // === INIT ===
   loadData(true);
 </script>
 </body>
