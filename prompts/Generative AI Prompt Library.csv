@@ -125,7 +125,7 @@ Output Requirements:
 Clear, concise, and well-structured  
 Covers all major points, decisions, and action items  
 Understandable for someone who wasn't present
-Plain Text file"
+Plain Text downloadable file"
 Project Management,Create Anonymized Production-like Data,Provide anonymized data similar in structure to our production database schema.
 Visualization,Best Chart Types for Given Dataset,"What are the best chart types to visualize the following data:
 [describe data]"
