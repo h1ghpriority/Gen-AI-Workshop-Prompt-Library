@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <title>Prompt Library — Lightweight Picker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="manifest" href="manifest.webmanifest">
   <style>
     :root { --bg:#0b0d10; --panel:#12161c; --muted:#a7b0be; --text:#e8edf3; --accent:#5ac8fa; --border:#1f2630;}
     html,body {margin:0; height:100%; background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";}
@@ -16,14 +17,15 @@
     .catbtn {display:block; width:100%; text-align:left; border:0; background:transparent; color:var(--muted); padding:10px 12px; border-radius:8px; cursor:pointer;}
     .catbtn.active, .catbtn:hover {background:#0f1318; color:var(--text);}
     .main {display:flex; flex-direction:column; min-width:0;}
-    .topbar {display:flex; gap:8px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border);}
-    .pill {padding:6px 10px; border:1px solid var(--border); border-radius:999px; background:#0f1318; color:var(--muted); font-size:12px;}
+    .topbar {display:flex; gap:8px; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border); flex-wrap:wrap;}
+    .pill {padding:6px 10px; border:1px solid var(--border); border-radius:999px; background:#0f1318; color:var(--muted); font-size:12px; cursor:pointer;}
     .content {padding:16px; overflow:auto; display:grid; gap:12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));}
     .card {border:1px solid var(--border); background:linear-gradient( to bottom, #11161d, #0f1318); border-radius:14px; display:flex; flex-direction:column; min-width:0;}
+    .card.selected { outline:2px solid var(--accent); }
     .card h3 {margin:0; padding:14px 14px 0 14px; font-size:16px; line-height:1.3;}
     .card .meta {color:var(--muted); font-size:12px; padding:2px 14px 8px 14px;}
     .card pre {margin:0; padding:12px 14px; overflow:auto; white-space:pre-wrap; word-break:break-word; max-height:260px;}
-    .actions {display:flex; gap:8px; padding:10px 14px 14px 14px; align-items:center; justify-content:flex-end;}
+    .actions {display:flex; gap:8px; padding:10px 14px 14px 14px; align-items:center; justify-content:flex-end; flex-wrap:wrap;}
     .btn {border:1px solid var(--border); background:#0f1318; color:var(--text); padding:8px 12px; border-radius:10px; cursor:pointer;}
     .btn:hover {background:#121923;}
     .fav {margin-right:auto; color:var(--muted); background:transparent;}
@@ -47,30 +49,38 @@
 
   <main class="main">
     <div class="topbar">
-      <span id="status" class="pill">Loading…</span>
+      <span id="status" class="pill" aria-live="polite">Loading…</span>
       <span id="count" class="pill">0 results</span>
       <span id="activeCat" class="pill">All categories</span>
-      <span class="pill">Tip: Press <b>Enter</b> to copy the first result</span>
+      <button id="copyMD" class="pill" title="Copy currently visible results as Markdown">Copy as Markdown</button>
+      <span class="pill">Tip: ↑/↓ select • Enter copies</span>
+      <button id="share" class="pill" title="Copy permalink of current state">Share</button>
+      <button id="reload" class="pill" title="Reload data">Reload data</button>
     </div>
 
     <section id="grid" class="content"></section>
     <div class="footer">
       <span id="lastSync" class="muted"></span>
-      <span class="muted"><a href="#" id="reload" style="color:var(--accent); text-decoration:none;">Reload data</a></span>
+      <span class="muted">Installable (PWA) & offline-ready</span>
     </div>
   </main>
 </div>
 
 <script>
   // === CONFIG ===
-  // Point to your RAW GitHub JSON (faster than the GitHub Contents API which returns base64).
   const DATA_URL = "https://raw.githubusercontent.com/h1ghpriority/Gen-AI-Workshop-Prompt-Library/main/prompts/Generative%20AI%20Prompt%20Library.json";
 
   // === STATE ===
-  let library = {};            // { category: [ {title, text}, ... ] }
-  let flat = [];               // [{category, title, text}]
+  let library = {};            // { category: [ {title, text} ] }
+  let flat = [];               // [{category, title, text, tags?, syn?}]
   let activeCategory = "All";
   let favorites = new Set(JSON.parse(localStorage.getItem("prompt_favs") || "[]"));
+  let cursor = 0, currentSet = []; // for keyboard nav
+
+  // === PWA ===
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js");
+  }
 
   // === HELPERS ===
   const $ = sel => document.querySelector(sel);
@@ -84,9 +94,7 @@
     kids.forEach(k => e.append(k));
     return e;
   };
-  const debounce = (fn, ms=200) => {
-    let t; return (...args) => { clearTimeout(t); t=setTimeout(() => fn(...args), ms); };
-  };
+  const debounce = (fn, ms=200) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms);} };
   const safe = s => (s ?? "").toString();
 
   function highlight(hay, needle){
@@ -98,30 +106,50 @@
     }catch{ return hay; }
   }
 
-  function persistFavs(){
-    localStorage.setItem("prompt_favs", JSON.stringify(Array.from(favorites)));
+  // Permalinks
+  function setURLState({cat, q, id}) {
+    const u = new URL(location);
+    if (cat) u.searchParams.set("cat", cat); else u.searchParams.delete("cat");
+    if (q)   u.searchParams.set("q", q);     else u.searchParams.delete("q");
+    if (id)  u.searchParams.set("id", id);   else u.searchParams.delete("id");
+    history.replaceState(null, "", u);
   }
+  function getURLState(){
+    const u = new URL(location);
+    return { cat: u.searchParams.get("cat") || "All",
+             q: u.searchParams.get("q")   || "",
+             id: u.searchParams.get("id") || "" };
+  }
+
+  function persistFavs(){ localStorage.setItem("prompt_favs", JSON.stringify([...favorites])); }
 
   // === RENDER ===
   function renderCategories(){
     const cats = ["All", ...Object.keys(library).sort()];
     const wrap = $("#cats"); wrap.innerHTML = "";
     cats.forEach(cat => {
-      const b = el("button", {class:`catbtn ${cat===activeCategory?"active":""}`}, cat);
-      b.addEventListener("click", () => { activeCategory = cat; $("#activeCat").textContent = cat + " category"; filterAndRender(); });
+      const b = el("button", {class:`catbtn ${cat===activeCategory?"active":""}`, title:`Filter: ${cat}`}, cat);
+      b.addEventListener("click", () => {
+        activeCategory = cat;
+        $("#activeCat").textContent = cat + " category";
+        setURLState({cat, q: $("#q").value});
+        cursor = 0; filterAndRender();
+      });
       wrap.append(b);
     });
   }
 
-  function card(item, query){
+  function card(item, query, isSelected){
     const id = `${item.category}::${item.title}`;
     const isFav = favorites.has(id);
-    const c = el("article", {class:"card"});
+    const c = el("article", {class:`card ${isSelected?"selected":""}`, "data-id": id});
     c.append(
       el("h3", {html: highlight(item.title, query)}),
-      el("div", {class:"meta"}, `${item.category}`),
-      el("pre", {html: highlight(item.text, query)}),
+      el("div", {class:"meta"}, `${item.category}`)
     );
+    c.append(el("pre", {html: highlight(item.text, query)}));
+
+    // Actions
     const fav = el("button", {class:`btn fav ${isFav?"active":""}`, title:"Toggle favorite"}, isFav ? "★ Favorite" : "☆ Favorite");
     fav.addEventListener("click", () => {
       if (favorites.has(id)) favorites.delete(id); else favorites.add(id);
@@ -129,41 +157,56 @@
       fav.classList.toggle("active");
       fav.textContent = fav.classList.contains("active") ? "★ Favorite" : "☆ Favorite";
     });
-    const copy = el("button", {class:"btn", title:"Copy prompt text to clipboard"}, "Copy");
+
+    const link = el("button", {class:"btn", title:"Copy permalink"}, "Link");
+    link.addEventListener("click", () => {
+      setURLState({cat:item.category, q: $("#q").value, id});
+      navigator.clipboard.writeText(location.href).then(()=>{
+        link.textContent="Linked"; setTimeout(()=> link.textContent="Link", 900);
+      });
+    });
+
+    const copy = el("button", {class:"btn", title:"Copy prompt"}, "Copy");
     copy.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(item.text);
         copy.textContent = "Copied!";
         setTimeout(()=> copy.textContent="Copy", 900);
       } catch (e) {
-        alert("Clipboard failed. Your browser may block it on file:// pages. Try hosting via HTTPS.");
+        alert("Clipboard failed. If opened as file://, host via HTTPS for best results.");
       }
     });
-    const actions = el("div", {class:"actions"}, fav, el("span",{class:"badge"}, `${item.text.length} chars`), copy);
+
+    const actions = el("div", {class:"actions"},
+      fav,
+      el("span",{class:"badge"}, `${item.text.length} chars`),
+      link, copy
+    );
     c.append(actions);
     return c;
   }
 
-  function filterAndRender(){
+  function currentQueryFilteredSet(){
     const q = $("#q").value.trim().toLowerCase();
     let set = flat;
-
     if (activeCategory !== "All") set = set.filter(x => x.category === activeCategory);
-    if (q) set = set.filter(x => x.title.toLowerCase().includes(q) || x.text.toLowerCase().includes(q));
+    if (q) set = set.filter(x => {
+      const t = x.title.toLowerCase(), b = x.text.toLowerCase();
+      return t.includes(q) || b.includes(q);
+    });
+    return {q, set};
+  }
+
+  function filterAndRender(){
+    const {q, set} = currentQueryFilteredSet();
+    currentSet = set.slice(); // for keyboard nav
 
     $("#count").textContent = `${set.length} result${set.length===1?"":"s"}`;
     const grid = $("#grid"); grid.innerHTML = "";
-    set.forEach(item => grid.append(card(item, q)));
+    set.forEach((item, i) => grid.append(card(item, q, i===cursor)));
 
-    // Keyboard convenience: Enter copies first result
-    document.onkeydown = (ev)=>{
-      if (ev.key === "Enter" && set.length){
-        navigator.clipboard.writeText(set[0].text).then(()=>{
-          const firstCopyBtn = grid.querySelector(".btn:last-child");
-          if(firstCopyBtn){ firstCopyBtn.textContent="Copied!"; setTimeout(()=> firstCopyBtn.textContent="Copy", 900); }
-        }).catch(()=>{});
-      }
-    };
+    // Update URL (no specific card id unless we had one)
+    setURLState({cat: activeCategory, q});
   }
 
   // === DATA LOADING ===
@@ -183,35 +226,47 @@
         if (!data) throw new Error("No cache available");
       }
 
-      // Normalize { category: [ {title,text} ] }
+      // Normalize shapes
       library = {};
       if (Array.isArray(data)) {
-        // fallback if file shape is [{category,title,text}, ...]
         for (const row of data){
           const cat = safe(row.category) || "Uncategorized";
           library[cat] ??= [];
           library[cat].push({title: safe(row.title)||"(Untitled)", text: safe(row.text)||""});
         }
       } else {
-        // expected shape: { "Category": [ {title,text}, ...], ... }
         library = data;
       }
 
       // Flatten
       flat = [];
       for (const [cat, arr] of Object.entries(library)){
-        (arr||[]).forEach(p => flat.push({category: cat, title: safe(p.title)||"(Untitled)", text: safe(p.text)||""}));
+        (arr||[]).forEach(p => flat.push({
+          category: cat, title: safe(p.title)||"(Untitled)", text: safe(p.text)||"",
+          tags: p.tags||[], syn: p.syn||[]
+        }));
       }
 
       renderCategories();
+
+      // Apply URL state
+      const s = getURLState();
+      activeCategory = s.cat || "All";
+      $("#activeCat").textContent = activeCategory + " category";
+      $("#q").value = s.q || "";
       filterAndRender();
+
+      // If deep-linked to an id, try to scroll and highlight nearest
+      if (s.id) {
+        const idx = currentSet.findIndex(x => `${x.category}::${x.title}` === s.id);
+        if (idx >= 0) { cursor = idx; filterAndRender(); document.querySelector(`[data-id="${s.id}"]`)?.scrollIntoView({block:"center"}); }
+      }
 
       const when = new Date().toLocaleString();
       $("#lastSync").textContent = `Synced ${when} (${from})`;
       $("#status").textContent = "Ready";
     } catch (e){
       console.error(e);
-      // Try cache if remote failed
       if (remoteFirst){
         $("#status").textContent = "Offline mode (cached)";
         try { await loadData(false); return; } catch {}
@@ -221,10 +276,38 @@
     }
   }
 
-  // === INIT ===
-  $("#q").addEventListener("input", debounce(filterAndRender, 120));
+  // === EVENTS ===
+  $("#q").addEventListener("input", debounce(()=>{ cursor=0; filterAndRender(); }, 120));
   $("#reload").addEventListener("click", (e)=>{ e.preventDefault(); loadData(true); });
 
+  $("#copyMD").onclick = async () => {
+    const {q, set} = currentQueryFilteredSet();
+    const md = set.map(r => `### ${r.title}\n**${r.category}**\n\n${r.text}\n`).join("\n");
+    await navigator.clipboard.writeText(md);
+    $("#copyMD").textContent="Copied MD"; setTimeout(()=>$("#copyMD").textContent="Copy as Markdown",900);
+  };
+
+  $("#share").onclick = async () => {
+    // include currently selected card id in the URL
+    const id = currentSet[cursor] ? `${currentSet[cursor].category}::${currentSet[cursor].title}` : "";
+    setURLState({cat: activeCategory, q: $("#q").value, id});
+    try {
+      await navigator.clipboard.writeText(location.href);
+      $("#share").textContent = "Permalink copied"; setTimeout(()=> $("#share").textContent="Share", 1200);
+    } catch {
+      alert("Copied URL may require HTTPS context in some browsers.");
+    }
+  };
+
+  // Keyboard navigation
+  document.addEventListener("keydown", (e)=>{
+    if(!currentSet.length) return;
+    if(e.key==="ArrowDown"){ e.preventDefault(); cursor = Math.min(cursor+1, currentSet.length-1); filterAndRender(); }
+    if(e.key==="ArrowUp"){   e.preventDefault(); cursor = Math.max(cursor-1, 0); filterAndRender(); }
+    if(e.key==="Enter"){     e.preventDefault(); navigator.clipboard.writeText(currentSet[cursor].text); }
+  });
+
+  // === INIT ===
   loadData(true);
 </script>
 </body>
